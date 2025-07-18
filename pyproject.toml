@@ -1,13 +1,23 @@
 [project]
 name = "sentry-tui"
 version = "0.1.0"
-description = "Add your description here"
+description = "TUI for intercepting and filtering Sentry devserver logs"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "textual>=4.0.0",
     "textual-dev>=1.7.0",
 ]
+
+[project.scripts]
+sentry-tui = "sentry_tui:main"
+dummy-app = "sentry_tui.dummy_app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
 
 [dependency-groups]
 dev = [
