@@ -8,6 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **CLI Tool Installation**: Support for `uv tool install .` to install sentry-tui as a global command-line tool
+- **Command-line Interface**: Proper CLI with argument parsing, help text, and version information
+  - `--auto-restart` flag for automatic process restart on crashes
+  - `--max-lines N` option to control memory usage (default: 10000)
+  - `--version` flag to show version information
+  - `--help` for comprehensive usage information
+- **Global Command Availability**: `sentry-tui` command available system-wide after installation
+- **Argument Separation**: Support for `--` separator to prevent conflicts between sentry-tui and target command flags
 - **Service Toggle Bar**: Horizontal bar with checkboxes to show/hide specific services in real-time
 - **Dynamic service discovery**: Automatically detects and adds toggles for any new services found in logs
 - **Process Management**: Complete process lifecycle control without restarting sentry-tui
@@ -35,6 +43,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Makefile test targets for different test suites
 
 ### Changed
+- **Documentation**: Updated README.md with comprehensive installation and usage instructions
+  - Added `uv tool install .` as the recommended installation method
+  - Updated all examples to use `getsentry devserver` instead of `sentry devserver`
+  - Added CLI reference section with all available options and examples
+  - Documented `--` separator usage for preventing argument conflicts
+- **Log Format Implementation**: Complete rewrite to match real Sentry devserver Honcho format
+  - Fixed from incorrect `service_name HH:MM:SS [LEVEL] module.name: message` format
+  - Updated to correct `HH:MM:SS service_name | log_message` format from actual Sentry source code analysis
+  - Analyzed `/Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py` for Honcho setup
+  - Analyzed `/Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py` for SentryPrinter format logic
 - Updated LogLine implementation to match exact Sentry devserver log format with SentryPrinter + HumanRenderer patterns
 - Updated dummy app to emit logs in exact Sentry format with proper ANSI color codes and timestamps
 - Updated all tests to use exact Sentry log format patterns instead of simulated formats
@@ -50,6 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed test data to use correct timestamp format (HH:MM:SS instead of full datetime)
 
 ### Fixed
+- **Log Format Accuracy**: Fixed completely incorrect log format implementation discovered from real Sentry devserver logs
+  - Service extraction now correctly parses `HH:MM:SS service_name | message` format
+  - Updated service extraction regex to `^\d{2}:\d{2}:\d{2}\s+([a-zA-Z0-9._-]+)\s*\|`
+  - Fixed module name extraction to use service name (limitation of Honcho format)
+  - Fixed message extraction to capture everything after pipe separator
+  - Updated all test data from old format to new Honcho format
+  - All 153 tests now pass with correct format implementation
+- **Build System**: Added proper build system configuration for setuptools in pyproject.toml
 - **Service Toggle Bar styling**: Fixed height and visibility issues with compact checkbox layout
 - **Code quality checks**: Updated Makefile and ruff configuration to exclude git-repos directory
 - Integration test method signature compatibility with updated dummy app format
@@ -93,9 +119,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safe communication between PTY reader and TUI
 
 ### Usage
-- `make run-dummy` - Run the dummy app for testing
+
+**Installation:**
+```bash
+uv tool install .                    # Install as global tool
+uv tool install --editable .        # Install editable for development
+```
+
+**Basic Usage:**
+```bash
+sentry-tui -- getsentry devserver --workers            # Run with getsentry devserver
+sentry-tui --auto-restart -- getsentry devserver       # Enable auto-restart
+sentry-tui --help                                      # Show help
+```
+
+**Development:**
+- `make run-dummy` - Run the dummy app for testing  
 - `make pty-test` - Test PTY interception with dummy app
-- `uv run python -m sentry_tui.pty_interceptor <command>` - Intercept any command
+- `uv run sentry-tui -- <command>` - Run via uv without installing
 
 ### Development Commands
 - `make dev` - Setup development environment

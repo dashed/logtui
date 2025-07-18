@@ -33,11 +33,29 @@ See [docs/implementation-status.md](docs/implementation-status.md) for detailed 
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
 - Access to Sentry development server
 
-### Setup
+### Method 1: Tool Installation (Recommended)
+
+Install sentry-tui as a global command-line tool:
+
+```bash
+# Install from local directory
+git clone <repository-url>
+cd sentry-tui
+uv tool install .
+
+# Or install editable for development
+uv tool install --editable .
+```
+
+This installs the `sentry-tui` command globally, available from any directory.
+
+### Method 2: Development Setup
+
+For development or if you prefer virtual environments:
 
 1. **Clone the repository**:
    ```bash
@@ -62,14 +80,24 @@ See [docs/implementation-status.md](docs/implementation-status.md) for detailed 
 Run the TUI with a Sentry development server:
 
 ```bash
-# Using uv (recommended)
-uv run python -m sentry_tui.pty_interceptor sentry devserver --workers
-
-# Or with activated venv
-python -m sentry_tui.pty_interceptor sentry devserver --workers
+# Using installed tool (recommended)
+sentry-tui -- getsentry devserver --workers
 
 # Enable auto-restart for crashed processes
-uv run python -m sentry_tui.pty_interceptor --auto-restart sentry devserver --workers
+sentry-tui --auto-restart -- getsentry devserver --workers
+
+# Show help and available options
+sentry-tui --help
+```
+
+**Alternative methods** (for development setup):
+
+```bash
+# Using uv run
+uv run sentry-tui -- getsentry devserver --workers
+
+# Direct module execution
+python -m sentry_tui -- getsentry devserver --workers
 ```
 
 ### Web Browser Mode
@@ -81,6 +109,25 @@ make serve
 ```
 
 Then navigate to `http://localhost:8000` in your browser.
+
+### CLI Reference
+
+```bash
+sentry-tui [OPTIONS] [--] COMMAND [COMMAND_ARGS...]
+
+Options:
+  --auto-restart       Automatically restart the process if it crashes
+  --max-lines N        Maximum number of log lines to keep in memory (default: 10000)  
+  --version           Show version information
+  -h, --help          Show help message
+
+Examples:
+  sentry-tui -- getsentry devserver
+  sentry-tui -- getsentry devserver --workers --celery-beat
+  sentry-tui --auto-restart -- getsentry devserver --workers
+  sentry-tui -- python manage.py runserver
+  sentry-tui -- npm run dev
+```
 
 ### Keyboard Shortcuts
 
