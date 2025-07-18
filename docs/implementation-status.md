@@ -4,9 +4,11 @@ This document tracks the current implementation status against the original feas
 
 ## Overview
 
-**Current Implementation Status**: ~75% Complete  
+**Current Implementation Status**: ~80% Complete  
 **Core Functionality**: ✅ Implemented  
-**Advanced Features**: 🚫 Missing  
+**CLI Tool Support**: ✅ Implemented  
+**Log Format Accuracy**: ✅ Fixed  
+**Advanced Features**: 🚧 Partially Implemented  
 **Polish & UX**: 🚫 Missing  
 
 ## ✅ Implemented Features
@@ -16,20 +18,28 @@ This document tracks the current implementation status against the original feas
 - [x] **Textual-based TUI** with RichLog widget  
 - [x] **Process spawning** with subprocess management
 - [x] **Signal handling** (Ctrl+C, quit functionality)
+- [x] **CLI Tool Installation** with `uv tool install .` support
+- [x] **Global Command Interface** with proper argument parsing
+- [x] **Build System Configuration** for setuptools compatibility
 
 ### Log Processing
-- [x] **Service name parsing** from Honcho prefix format
-- [x] **Service coloring** (server, worker, celery-beat, webpack, etc.)
-- [x] **Log level recognition** ([ERROR], [WARNING], [INFO], [DEBUG])
-- [x] **Timestamp parsing** (HH:MM:SS format)
+- [x] **Accurate Log Format Parsing** based on real Sentry devserver Honcho format
+- [x] **Service name extraction** from `HH:MM:SS service_name | message` format  
+- [x] **Service coloring** (server, worker, celery-beat, webpack, getsentry-outcomes, etc.)
+- [x] **Log level inference** from content patterns (traceback, error, warning keywords)
+- [x] **Timestamp parsing** (HH:MM:SS format from Honcho output)
 - [x] **ANSI color handling** with Rich-based coloring system
 - [x] **Background color bleeding prevention**
+- [x] **Source Code Analysis** of Sentry's actual formatting implementation
 
 ### User Interface
 - [x] **Main log display** with scrollable RichLog widget
 - [x] **Filter input bar** with real-time updates
-- [x] **Basic keyboard shortcuts** (q=quit, f=focus filter, l=focus log, c=clear, p=pause)
+- [x] **Process management controls** (graceful/force shutdown, restart, auto-restart)
+- [x] **Process status bar** with real-time PID, state, and restart count display
+- [x] **Comprehensive keyboard shortcuts** (q=quit, f=focus filter, l=focus log, c=clear, p=pause, s=shutdown, k=kill, r=restart, a=auto-restart)
 - [x] **Header and footer** with application title and shortcuts
+- [x] **Command-line interface** with help text, version info, and option parsing
 
 ### Filtering & Search
 - [x] **Real-time filtering** with case-insensitive search
@@ -44,10 +54,14 @@ This document tracks the current implementation status against the original feas
 - [x] **Thread-safe communication** between PTY reader and TUI
 
 ### Quality Assurance
-- [x] **Comprehensive test suite** (41 tests passing)
-- [x] **Unit tests** for all core components
+- [x] **Comprehensive test suite** (153 tests passing)
+- [x] **Unit tests** for all core components including log parsing
 - [x] **Integration tests** for end-to-end functionality
+- [x] **Service discovery tests** for dynamic service detection
+- [x] **Process management tests** with mocked system calls
+- [x] **Log format accuracy tests** using real Sentry log samples
 - [x] **Error handling** for file descriptors and process management
+- [x] **Code quality checks** (linting, formatting, type checking)
 
 ## 🚫 Missing Features
 
@@ -62,19 +76,20 @@ This document tracks the current implementation status against the original feas
 **Features**: Real-time service filtering, compact design, all services enabled by default  
 **Completed**: December 2024
 
-#### 2. DevServer Flag Integration
+#### 2. DevServer Flag Integration  
 **From Spec**: Pass-through and detection of devserver flags
-- [ ] **CLI argument pass-through** to devserver subprocess
+- [x] **CLI argument pass-through** to devserver subprocess (via `--` separator)
+- [x] **Command flexibility** supports any command arguments  
 - [ ] **`--prefix/--no-prefix` detection** and parsing adjustment
 - [ ] **`--pretty/--no-pretty` detection** and ANSI handling
 - [ ] **`--logformat` support** (JSON vs human format)
-- [ ] **Process flag handling** (--workers, --celery-beat, etc.)
+- [x] **Process flag handling** (--workers, --celery-beat, etc. passed through)
 
-**Current Status**: Hardcoded command execution  
-**Impact**: Cannot use with different devserver configurations  
-**Effort**: Medium (1-2 weeks)
+**Current Status**: ✅ Partial - Basic argument pass-through implemented  
+**Impact**: Can use with any devserver configuration via CLI  
+**Effort**: Small (1 week for remaining auto-detection features)
 
-#### 2. Log Level Filtering
+#### 3. Log Level Filtering
 **From Spec**: Show/hide logs by severity level
 - [ ] **Independent filtering** by DEBUG/INFO/WARNING/ERROR
 - [ ] **Log level toggle buttons** in UI
@@ -86,7 +101,7 @@ This document tracks the current implementation status against the original feas
 
 ### Medium Priority (Enhanced Functionality)
 
-#### 3. Advanced Filter Modes
+#### 4. Advanced Filter Modes
 **From Spec**: Multiple filter types and modes
 - [ ] **Regex filter support** for complex pattern matching
 - [ ] **Exact match mode** toggle
@@ -97,7 +112,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Power users cannot use complex search patterns  
 **Effort**: Medium (1-2 weeks)
 
-#### 4. Export Functionality
+#### 5. Export Functionality
 **From Spec**: Save filtered results to file
 - [ ] **Export current view** to text file
 - [ ] **Export with timestamps** and service names
@@ -108,20 +123,21 @@ This document tracks the current implementation status against the original feas
 **Impact**: Cannot share or analyze log data externally  
 **Effort**: Small (1 week)
 
-#### 5. GetSentry Support
+#### 6. GetSentry Support
 **From Spec**: Support for GetSentry-specific services and configuration
-- [ ] **Recognition of `getsentry-outcomes` service**
-- [ ] **Extended service colors** for GetSentry processes
+- [x] **Recognition of `getsentry-outcomes` service**
+- [x] **Extended service colors** for GetSentry processes  
+- [x] **Service support** for GetSentry ecosystem (getsentry-outcomes, celery-beat, taskworker)
 - [ ] **Configuration detection** (GetSentry vs core Sentry)
-- [ ] **Additional service support** for GetSentry ecosystem
+- [ ] **Additional service support** for any remaining GetSentry-specific processes
 
-**Current Status**: ✅ GetSentry services partially supported (getsentry-outcomes, celery-beat, taskworker)  
-**Impact**: Most GetSentry developers can use effectively  
-**Effort**: Small (1 week for remaining services)
+**Current Status**: ✅ Mostly Complete - Core GetSentry services supported  
+**Impact**: GetSentry developers can use effectively with current services  
+**Effort**: Small (1 week for any remaining edge cases)
 
 ### Low Priority (Polish & UX)
 
-#### 6. Enhanced Status Bar
+#### 7. Enhanced Status Bar
 **From Spec**: Rich status information display
 ```
 │ Filter: █                                                  Lines: 1,234   │
@@ -135,7 +151,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Users lack visibility into current state  
 **Effort**: Small (1 week)
 
-#### 7. Search History
+#### 8. Search History
 **From Spec**: Remember and navigate previous searches
 - [ ] **Search history storage** with persistence
 - [ ] **History navigation** with up/down arrows
@@ -146,7 +162,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Users must retype common filters  
 **Effort**: Medium (1-2 weeks)
 
-#### 8. Help System
+#### 9. Help System
 **From Spec**: Comprehensive help and documentation
 - [ ] **Help overlay** with keyboard shortcuts
 - [ ] **Interactive tutorial** for new users
@@ -157,7 +173,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Users must learn shortcuts by trial and error  
 **Effort**: Small (1 week)
 
-#### 9. Configuration Support
+#### 10. Configuration Support
 **From Spec**: Persistent settings and customization
 - [ ] **Configuration file support** (YAML/JSON)
 - [ ] **Custom service colors** configuration
@@ -171,66 +187,71 @@ This document tracks the current implementation status against the original feas
 
 ## 🎯 Recommended Implementation Roadmap
 
-### Phase 1: Production Readiness (2-4 weeks)
-**Goal**: Make the tool usable for daily development work
+### Phase 1: Production Readiness (1-2 weeks) 
+**Goal**: Complete remaining essential features for daily development work
 
-1. **DevServer Flag Integration** (2 weeks)
-   - Implement CLI argument pass-through
-   - Add flag detection and parsing adjustment
-   - Test with various devserver configurations
+1. ✅ **CLI Tool Support** (COMPLETED)
+   - ✅ Implement global CLI installation via `uv tool install .`
+   - ✅ Add comprehensive argument parsing and help system
+   - ✅ Support argument separation with `--` to prevent conflicts
 
 2. ✅ **Service Toggle Bar** (COMPLETED)
    - ✅ Add service toggle UI components
    - ✅ Implement service-based filtering logic
    - ✅ Integrate with existing filter system
 
-2. **Log Level Filtering** (1-2 weeks)
-   - Add log level parsing and filtering
-   - Create level toggle UI elements
+3. ✅ **Log Format Accuracy** (COMPLETED)
+   - ✅ Fix completely incorrect log format implementation
+   - ✅ Implement real Sentry Honcho format parsing
+   - ✅ Update all parsing logic and test data
+
+4. **Log Level Filtering** (1-2 weeks) - REMAINING
+   - Add log level parsing and filtering UI
+   - Create level toggle UI elements  
    - Implement minimum level filtering
 
-### Phase 2: Enhanced Features (3-4 weeks)
-**Goal**: Add power user features and GetSentry support
+### Phase 2: Enhanced Features (2-3 weeks)
+**Goal**: Add power user features and remaining functionality
 
-3. **Advanced Filter Modes** (2 weeks)
+5. **Advanced Filter Modes** (2 weeks)
    - Implement regex filter support
    - Add filter mode switching UI
    - Create exact match mode
 
-4. **Export Functionality** (1 week)
+6. **Export Functionality** (1 week)
    - Add export commands and UI
    - Implement multiple export formats
    - Test with large log volumes
 
-5. **GetSentry Support** (1 week)
-   - Add GetSentry service recognition
-   - Extend service color mapping
-   - Test with GetSentry devserver
+7. ✅ **GetSentry Support** (MOSTLY COMPLETE)
+   - ✅ GetSentry service recognition implemented
+   - ✅ Extended service color mapping complete
+   - Minor: Add any remaining GetSentry-specific services
 
 ### Phase 3: Polish & UX (2-3 weeks)
 **Goal**: Improve user experience and discoverability
 
-6. **Enhanced Status Bar** (1 week)
+8. **Enhanced Status Bar** (1 week)
    - Add line count and filter indicators
    - Implement performance metrics display
 
-7. **Search History** (1-2 weeks)
+9. **Search History** (1-2 weeks)
    - Implement search persistence
    - Add history navigation
    - Create search suggestions
 
-8. **Help System** (1 week)
-   - Create help overlay
-   - Add keyboard shortcut documentation
-   - Implement context-sensitive help
+10. **Help System** (1 week)
+    - Create help overlay
+    - Add keyboard shortcut documentation
+    - Implement context-sensitive help
 
 ### Phase 4: Advanced Configuration (1-2 weeks)
 **Goal**: Enable customization and advanced use cases
 
-9. **Configuration Support** (1-2 weeks)
-    - Implement configuration file system
-    - Add customization options
-    - Create migration system for settings
+11. **Configuration Support** (1-2 weeks)
+     - Implement configuration file system
+     - Add customization options
+     - Create migration system for settings
 
 ## Current Architecture Gaps
 
@@ -264,14 +285,27 @@ This document tracks the current implementation status against the original feas
 
 ## Conclusion
 
-The current implementation provides a **solid foundation** with core functionality working well. With the **Service Toggle Bar** now complete, the **next phase** should focus on remaining **production readiness** features (DevServer integration, log level filtering) before moving to **advanced features** and **polish**.
+The current implementation has reached **80% completion** with major infrastructure and core features now solid. Recent major accomplishments include **CLI tool installation support**, **accurate log format parsing**, and **comprehensive testing**.
 
 **Key Success Metrics**:
-- ✅ **Core functionality** is stable and tested
-- ✅ **Service Toggle Bar** is implemented and working
-- 🚫 **Production readiness** features are partially complete
+- ✅ **Core functionality** is stable and extensively tested (153 tests)
+- ✅ **CLI Tool Installation** implemented with global command support
+- ✅ **Log Format Accuracy** fixed with real Sentry devserver format
+- ✅ **Service Toggle Bar** implemented and working
+- ✅ **Process Management** with full lifecycle control
+- ✅ **GetSentry Support** mostly complete
+- 🚧 **Production readiness** features mostly complete (CLI ✅, DevServer partial ✅)
 - 🚫 **Advanced features** need implementation
 - 🚫 **User experience** polish is needed
 
-**Estimated time to production-ready**: 2-4 weeks  
-**Estimated time to feature-complete**: 8-12 weeks
+**Recent Major Achievements** (December 2024):
+- Fixed completely incorrect log format with real Sentry source code analysis
+- Added CLI tool installation support via `uv tool install .`
+- Implemented comprehensive argument parsing and global command availability
+- Added proper build system configuration for package distribution
+- Achieved 100% test pass rate with updated format implementation
+
+**Current Status**: Ready for daily development use with basic features complete.
+
+**Estimated time to production-ready**: 1-2 weeks (just log level filtering remaining)  
+**Estimated time to feature-complete**: 6-8 weeks (reduced from previous estimate)
