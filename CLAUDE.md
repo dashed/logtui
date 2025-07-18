@@ -40,6 +40,7 @@ Note: `uv` is 10x-100x faster than pip and requires virtual environments by defa
 ## NEVER RUN THESE COMMANDS
 - `make pty-test` - Interactive TUI that requires manual interaction (use pytest instead)
 - `make run-dummy` - Interactive dummy app that requires manual interaction (use pytest instead)
+- `make serve` - Serves TUI app in web browser, requires manual interaction (use pytest instead)
 
 ## Test Commands
 - `uv run pytest` - Run all tests

@@ -45,39 +45,39 @@ def apply_rich_coloring(text: str) -> Text:
     """Apply Rich-based coloring to log text while stripping ANSI codes."""
     # Strip all ANSI codes first
     clean_text = strip_ansi_codes(text)
-    
+
     # Create a Rich Text object
     rich_text = Text(clean_text)
-    
+
     # Apply coloring based on content patterns
     if "server" in clean_text:
         # Purple color for server logs (matching Sentry's color scheme)
-        rich_text.highlight_regex(r'\bserver\b', style="rgb(108,95,199)")
+        rich_text.highlight_regex(r"\bserver\b", style="rgb(108,95,199)")
     elif "worker" in clean_text or "taskworker" in clean_text:
         # Yellow color for worker logs
-        rich_text.highlight_regex(r'\b(worker|taskworker)\b', style="rgb(255,194,39)")
+        rich_text.highlight_regex(r"\b(worker|taskworker)\b", style="rgb(255,194,39)")
     elif "webpack" in clean_text:
         # Blue color for webpack logs
-        rich_text.highlight_regex(r'\bwebpack\b', style="rgb(61,116,219)")
+        rich_text.highlight_regex(r"\bwebpack\b", style="rgb(61,116,219)")
     elif "cron" in clean_text or "celery-beat" in clean_text:
         # Pink color for cron/beat logs
-        rich_text.highlight_regex(r'\b(cron|celery-beat)\b', style="rgb(255,86,124)")
+        rich_text.highlight_regex(r"\b(cron|celery-beat)\b", style="rgb(255,86,124)")
     elif "relay" in clean_text:
         # Red color for relay logs
-        rich_text.highlight_regex(r'\brelay\b', style="rgb(250,71,71)")
+        rich_text.highlight_regex(r"\brelay\b", style="rgb(250,71,71)")
     elif "getsentry-outcomes" in clean_text:
         # Orange color for outcomes logs
-        rich_text.highlight_regex(r'\bgetsentry-outcomes\b', style="rgb(255,119,56)")
-    
+        rich_text.highlight_regex(r"\bgetsentry-outcomes\b", style="rgb(255,119,56)")
+
     # Apply log level coloring
-    rich_text.highlight_regex(r'\[ERROR\]', style="bold red")
-    rich_text.highlight_regex(r'\[WARNING\]', style="bold yellow")
-    rich_text.highlight_regex(r'\[INFO\]', style="bold blue")
-    rich_text.highlight_regex(r'\[DEBUG\]', style="bold dim")
-    
+    rich_text.highlight_regex(r"\[ERROR\]", style="bold red")
+    rich_text.highlight_regex(r"\[WARNING\]", style="bold yellow")
+    rich_text.highlight_regex(r"\[INFO\]", style="bold blue")
+    rich_text.highlight_regex(r"\[DEBUG\]", style="bold dim")
+
     # Highlight timestamps
-    rich_text.highlight_regex(r'\d{2}:\d{2}:\d{2}', style="dim")
-    
+    rich_text.highlight_regex(r"\d{2}:\d{2}:\d{2}", style="dim")
+
     return rich_text
 
 
@@ -85,20 +85,20 @@ def strip_ansi_background_colors(text: str) -> str:
     """Remove ANSI background color codes while preserving foreground colors and other formatting."""
     # Pattern to match and remove background color codes while preserving other codes
     # This handles combined codes like ESC[31;42m (red foreground, green background)
-    
+
     def replace_bg_codes(match):
         full_code = match.group(0)
         # Extract the parameters between ESC[ and m
         params = full_code[2:-1]  # Remove ESC[ and m
-        
+
         # Split by semicolon and filter out background codes
-        parts = params.split(';')
+        parts = params.split(";")
         filtered_parts = []
-        
+
         i = 0
         while i < len(parts):
             param = parts[i]
-            
+
             # Check if this is a background color code
             if param.isdigit():
                 num = int(param)
@@ -107,26 +107,26 @@ def strip_ansi_background_colors(text: str) -> str:
                     i += 1
                     continue
                 # 256-color background (48;5;n)
-                elif num == 48 and i + 2 < len(parts) and parts[i + 1] == '5':
+                elif num == 48 and i + 2 < len(parts) and parts[i + 1] == "5":
                     i += 3  # Skip 48, 5, and the color number
                     continue
                 # RGB background (48;2;r;g;b)
-                elif num == 48 and i + 4 < len(parts) and parts[i + 1] == '2':
+                elif num == 48 and i + 4 < len(parts) and parts[i + 1] == "2":
                     i += 5  # Skip 48, 2, r, g, b
                     continue
-            
+
             filtered_parts.append(param)
             i += 1
-        
+
         # If no codes remain, return empty string
         if not filtered_parts:
             return ""
-        
+
         # Reconstruct the escape sequence
         return f"\x1b[{';'.join(filtered_parts)}m"
-    
+
     # Pattern to match any ANSI escape sequence
-    pattern = re.compile(r'\x1b\[[0-9;]*m')
+    pattern = re.compile(r"\x1b\[[0-9;]*m")
     return pattern.sub(replace_bg_codes, text)
 
 
@@ -443,7 +443,7 @@ class SentryTUIApp(App):
         """Add a log line to the display."""
         log_widget = self.query_one("#log_display", RichLog)
         # Apply Rich-based coloring instead of ANSI codes
-        rich_content = apply_rich_coloring(log_line.content.rstrip('\n'))
+        rich_content = apply_rich_coloring(log_line.content.rstrip("\n"))
         log_widget.write(rich_content, scroll_end=True)
 
     def update_log_display(self) -> None:
@@ -455,7 +455,7 @@ class SentryTUIApp(App):
         for log_line in self.log_lines:
             if self.matches_filter(log_line):
                 # Apply Rich-based coloring instead of ANSI codes
-                rich_content = apply_rich_coloring(log_line.content.rstrip('\n'))
+                rich_content = apply_rich_coloring(log_line.content.rstrip("\n"))
                 log_widget.write(rich_content, scroll_end=False)
 
         # Scroll to end

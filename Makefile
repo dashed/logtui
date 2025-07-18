@@ -1,6 +1,9 @@
 # Makefile for sentry-tui development
 
-.PHONY: sync run-dummy test-dummy pty-test clean help dev test test-unit test-integration test-fast test-slow lint format check typecheck
+.PHONY: sync run-dummy test-dummy pty-test serve clean help dev test test-unit test-integration test-fast test-slow lint format check typecheck
+
+# Default target - show help
+.DEFAULT_GOAL := help
 
 # Sync dependencies (explicit sync for CI or when needed)
 sync:
@@ -23,6 +26,10 @@ test-dummy:
 # Test PTY-based interception with dummy app (press 'q' or Ctrl+C to exit)
 pty-test:
 	uv run python -m sentry_tui.pty_interceptor python -m sentry_tui.dummy_app
+
+# Run the PTY interceptor application in a web browser
+serve:
+	uv run textual serve --dev "python -m sentry_tui.pty_interceptor python -m sentry_tui.dummy_app"
 
 # Development workflow - sync and run tests
 dev: sync
@@ -83,6 +90,7 @@ help:
 	@echo "  run-dummy       - Run the dummy app for testing"
 	@echo "  test-dummy      - Test the dummy app briefly"
 	@echo "  pty-test        - Test PTY-based interception (press 'q' or Ctrl+C to exit)"
+	@echo "  serve           - Run the PTY interceptor application in a web browser"
 	@echo "  dev             - Setup development environment"
 	@echo ""
 	@echo "Testing:"

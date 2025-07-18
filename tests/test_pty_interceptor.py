@@ -2,7 +2,11 @@
 
 import subprocess
 from unittest.mock import Mock, patch, call
-from sentry_tui.pty_interceptor import PTYInterceptor, strip_ansi_background_colors, apply_rich_coloring
+from sentry_tui.pty_interceptor import (
+    PTYInterceptor,
+    strip_ansi_background_colors,
+    apply_rich_coloring,
+)
 
 
 class TestPTYInterceptor:
@@ -368,7 +372,9 @@ class TestPTYInterceptor:
     @patch("os.killpg")
     @patch("os.getpgid")
     @patch("os.close")
-    def test_stop_interceptor_fd_already_closed(self, mock_close, mock_getpgid, mock_killpg):
+    def test_stop_interceptor_fd_already_closed(
+        self, mock_close, mock_getpgid, mock_killpg
+    ):
         """Test stopping the PTY interceptor when file descriptor is already closed."""
         command = ["test", "command"]
         interceptor = PTYInterceptor(command)
@@ -579,91 +585,97 @@ class TestAnsiBackgroundColorStripping:
 
 class TestLogLineFormatting:
     """Test cases for log line formatting and processing."""
-    
+
     def test_newline_stripping_in_log_processing(self):
         """Test that trailing newlines are properly handled in log processing."""
         from sentry_tui.pty_interceptor import LogLine
-        
+
         # Test content with trailing newline
         content_with_newline = "Test log message\n"
         log_line = LogLine(content_with_newline)
-        
+
         # The content should be stored as-is in the LogLine
         assert log_line.content == content_with_newline
-        
+
         # But when we strip it for display, it should remove the trailing newline
         clean_content = strip_ansi_background_colors(log_line.content)
-        clean_content = clean_content.rstrip('\n')
+        clean_content = clean_content.rstrip("\n")
         assert clean_content == "Test log message"
-        
+
     def test_multiple_newlines_stripping(self):
         """Test that multiple trailing newlines are properly stripped."""
         content = "Test message\n\n\n"
         clean_content = strip_ansi_background_colors(content)
-        clean_content = clean_content.rstrip('\n')
+        clean_content = clean_content.rstrip("\n")
         assert clean_content == "Test message"
-        
+
     def test_no_newline_unchanged(self):
         """Test that content without newlines is unchanged."""
         content = "Test message without newline"
         clean_content = strip_ansi_background_colors(content)
-        clean_content = clean_content.rstrip('\n')
+        clean_content = clean_content.rstrip("\n")
         assert clean_content == "Test message without newline"
-        
+
     def test_combined_ansi_and_newline_stripping(self):
         """Test stripping both ANSI background colors and trailing newlines."""
         content = "Hello \x1b[41mRed Background\x1b[0m World\n"
         clean_content = strip_ansi_background_colors(content)
-        clean_content = clean_content.rstrip('\n')
+        clean_content = clean_content.rstrip("\n")
         assert clean_content == "Hello Red Background\x1b[0m World"
 
 
 class TestRichColoring:
     """Test cases for Rich-based coloring functionality."""
-    
+
     def test_apply_rich_coloring_strips_ansi(self):
         """Test that Rich coloring strips ANSI codes."""
         from rich.text import Text
+
         content = "Hello \x1b[31mRed\x1b[0m World"
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)
         assert str(result) == "Hello Red World"
-        
+
     def test_apply_rich_coloring_server_logs(self):
         """Test that server logs get proper coloring."""
         from rich.text import Text
+
         content = "server 01:23:45 [INFO] test message"
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)
         assert str(result) == "server 01:23:45 [INFO] test message"
-        
+
     def test_apply_rich_coloring_log_levels(self):
         """Test that log levels get proper coloring."""
         from rich.text import Text
+
         content = "test [ERROR] error message"
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)
         assert str(result) == "test [ERROR] error message"
-        
+
     def test_apply_rich_coloring_timestamps(self):
         """Test that timestamps get proper styling."""
         from rich.text import Text
+
         content = "test 12:34:56 message"
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)
         assert str(result) == "test 12:34:56 message"
-        
+
     def test_apply_rich_coloring_worker_logs(self):
         """Test that worker logs get proper coloring."""
         from rich.text import Text
+
         content = "worker 01:23:45 [INFO] test message"
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)
         assert str(result) == "worker 01:23:45 [INFO] test message"
-        
+
     def test_apply_rich_coloring_plain_text(self):
         """Test that plain text without special patterns works."""
         from rich.text import Text
+
         content = "plain text message"
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)

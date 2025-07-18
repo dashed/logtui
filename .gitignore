@@ -9,4 +9,4 @@ wheels/
 # Virtual environments
 .venv
 
-git-repos/
+git-repos/textual.log
