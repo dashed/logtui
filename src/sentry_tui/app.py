@@ -37,31 +37,41 @@ class SentryTUIApp(App):
     
     #filter_input {
         height: 3;
-        border: solid $primary;
-        margin-bottom: 1;
+        border: solid $accent;
+        margin: 1;
+    }
+    
+    #status_bar {
+        height: 1;
+        background: $surface;
+        color: $text;
+        padding: 0 1;
     }
     
     #service_toggle_bar {
-        height: 1;
-        margin-bottom: 1;
-        padding: 0 1;
-        background: $surface;
+        height: auto;
+        margin: 0;
+        padding: 0;
     }
     
     #service_toggle_bar Checkbox {
+        margin: 0 1;
+        padding: 0;
         width: auto;
-        margin: 0 1 0 0;
     }
     
     #process_status_bar {
         height: 1;
-        padding: 0 1;
         background: $surface;
+        color: $text;
+        padding: 0 1;
+        margin: 0;
     }
     
     #process_status_bar Static {
+        margin: 0 1;
+        padding: 0;
         width: auto;
-        margin: 0 1 0 0;
     }
     """
 
@@ -97,29 +107,35 @@ class SentryTUIApp(App):
         self.log_lines: List[LogLine] = []
         self.discovered_services: set = set()
         self.auto_restart = auto_restart
-        self.max_lines = 10000  # Default max lines
+        self.auto_restart_enabled = auto_restart
 
     def compose(self) -> ComposeResult:
-        """Compose the UI layout."""
+        """Compose the TUI layout."""
         yield Header()
-        yield Input(placeholder="Filter logs...", id="filter_input")
-        yield ServiceToggleBar(id="service_toggle_bar")
-        yield RichLog(id="log_display", highlight=True, markup=True)
-        yield ProcessStatusBar(id="process_status_bar")
+        yield Vertical(
+            Input(placeholder="Filter logs...", id="filter_input"),
+            ServiceToggleBar(services=[], id="service_toggle_bar"),
+            ProcessStatusBar(id="process_status_bar"),
+            RichLog(id="log_display", auto_scroll=True),
+            id="main_container",
+        )
         yield Footer()
 
     def on_mount(self) -> None:
-        """Initialize the application when mounted."""
-        # Start the PTY interceptor
+        """Initialize the interceptor when the app mounts."""
         self.interceptor = PTYInterceptor(
-            self.command, 
-            on_output=self.handle_log_output, 
-            auto_restart=self.auto_restart
+            command=self.command,
+            on_output=self.handle_log_output,
+            auto_restart=self.auto_restart,
         )
+
+        # Set up process state callback
         self.interceptor.add_state_callback(self.on_process_state_changed)
+
+        # Start the interceptor
         self.interceptor.start()
 
-        # Focus the filter input by default
+        # Set up filter input handler
         filter_input = self.query_one("#filter_input", Input)
         filter_input.focus()
 
@@ -129,7 +145,7 @@ class SentryTUIApp(App):
     def on_process_state_changed(self, new_state: ProcessState) -> None:
         """Handle process state changes."""
         self.process_state = new_state
-        # Update status display when state changes
+        # Use a small delay to ensure state is fully updated
         self.call_from_thread(self.update_process_status)
 
     def update_process_status(self) -> None:
@@ -163,30 +179,24 @@ class SentryTUIApp(App):
         self.update_log_display()
 
     def handle_log_output(self, line: str) -> None:
-        """Handle new log output from the interceptor."""
-        if self.paused:
-            return
+        """Handle new log output from the intercepted process."""
+        if not self.paused:
+            log_line = LogLine(line)
+            self.log_lines.append(log_line)
+            self.line_count = len(self.log_lines)
 
-        # Create a LogLine object
-        log_line = LogLine(line)
+            # Discover new services dynamically
+            if log_line.service not in self.discovered_services:
+                self.discovered_services.add(log_line.service)
+                self.call_from_thread(self.add_service_to_toggle_bar, log_line.service)
 
-        # Add to our log storage with memory management
-        self.log_lines.append(log_line)
-        
-        # Keep only the last max_lines to prevent memory issues
-        if len(self.log_lines) > self.max_lines:
-            self.log_lines = self.log_lines[-self.max_lines:]
+            # Keep only the last 10,000 lines to prevent memory issues
+            if len(self.log_lines) > 10000:
+                self.log_lines = self.log_lines[-10000:]
 
-        # Discover new services dynamically
-        if log_line.service not in self.discovered_services:
-            self.discovered_services.add(log_line.service)
-            self.call_from_thread(self.add_service_to_toggle_bar, log_line.service)
-
-        # Update display if line matches current filter
-        if self.matches_filter(log_line):
-            self.call_from_thread(self.add_log_line, log_line)
-
-        self.line_count = len(self.log_lines)
+            # Update display if line matches filter
+            if self.matches_filter(log_line):
+                self.call_from_thread(self.add_log_line, log_line)
 
     def matches_filter(self, log_line: LogLine) -> bool:
         """Check if a log line matches the current filter."""
