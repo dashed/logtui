@@ -1,10 +1,44 @@
-"""Sentry TUI - A terminal user interface for filtering Sentry devserver logs."""
+"""Sentry TUI - A terminal user interface for filtering Sentry devserver logs.
+
+This package provides a Terminal User Interface for intercepting and filtering
+Sentry devserver logs with features like service filtering, command editing,
+process monitoring, and more.
+
+Main components:
+- SentryTUIApp: Main application class
+- PTYInterceptor: Core PTY-based process interception
+- UI components: Service toggles, status bars, command editor
+- Process monitoring: Port detection, memory/CPU tracking
+- Log processing: Parsing and filtering Sentry Honcho format logs
+"""
 
 import sys
 import argparse
 from typing import List, Optional
 
-from .pty_interceptor import SentryTUIApp
+# Import main classes for easy access
+from .app import SentryTUIApp
+from .constants import ProcessState
+from .log_processing import LogLine
+from .pty_core import PTYInterceptor
+from .ui_components import CommandEditScreen, ProcessStatusBar, ServiceToggleBar
+from .utils import apply_rich_coloring, strip_ansi_codes, strip_ansi_background_colors
+
+__version__ = "0.1.0"
+
+__all__ = [
+    "SentryTUIApp",
+    "PTYInterceptor",
+    "ProcessState", 
+    "LogLine",
+    "ServiceToggleBar",
+    "ProcessStatusBar",
+    "CommandEditScreen",
+    "strip_ansi_codes", 
+    "strip_ansi_background_colors",
+    "apply_rich_coloring",
+    "main",
+]
 
 
 def create_parser() -> argparse.ArgumentParser:
