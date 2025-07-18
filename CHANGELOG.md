@@ -36,13 +36,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - If all services are enabled, disables all services
   - If any services are disabled, enables all services
   - Maintains consistency with existing toggle behavior
-- **Enhanced Status Bar**: Rich status information display
-  - Line count display (total and filtered)
-  - Active filter indicators showing current search terms
-  - Service count indicators showing discovered services
+- **Enhanced Status Bar**: Rich status information display with real-time metrics
+  - Line count display (total and filtered) with thousands separators
+  - Active filter indicators showing current search terms with Rich markup
+  - Service count indicators showing discovered services count
   - Performance metrics (logs/sec, memory usage estimation)
-  - Real-time updates with 1-second refresh interval
-  - Automatic filtered line count calculation
+  - Real-time updates with 1-second refresh interval via timer
+  - Automatic filtered line count calculation on every update
+  - Seamless integration with existing filter and service toggle systems
+  - Consistent theming using $surface background and $accent borders
+  - Compact layout with no gaps between UI elements
 - **Process Management**: Complete process lifecycle control without restarting sentry-tui
   - **Graceful shutdown**: Send SIGTERM to devserver process (key: `s`)
   - **Force quit**: Send SIGKILL to devserver process (key: `k`)

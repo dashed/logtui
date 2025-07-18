@@ -66,7 +66,7 @@ class SentryTUIApp(App):
     #filter_input {
         height: 3;
         border: solid $accent;
-        margin: 1;
+        margin: 0 1 0 1;
     }
     
     #status_bar {
@@ -113,11 +113,11 @@ class SentryTUIApp(App):
     
     #enhanced_status_bar {
         height: auto;
-        background: red;
-        color: white;
+        background: $surface;
+        color: $text;
         padding: 0 1;
-        border-top: solid yellow;
-        border-bottom: solid yellow;
+        border-top: solid $accent;
+        border-bottom: solid $accent;
         text-style: bold;
     }
     """
