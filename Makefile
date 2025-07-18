@@ -20,7 +20,7 @@ test-dummy:
 		echo "No timeout command available, skipping test-dummy"; \
 	fi
 
-# Test PTY-based interception with dummy app
+# Test PTY-based interception with dummy app (press 'q' or Ctrl+C to exit)
 pty-test:
 	uv run python -m sentry_tui.pty_interceptor python -m sentry_tui.dummy_app
 
@@ -82,7 +82,7 @@ help:
 	@echo "  sync            - Sync dependencies (uv handles this automatically with uv run)"
 	@echo "  run-dummy       - Run the dummy app for testing"
 	@echo "  test-dummy      - Test the dummy app briefly"
-	@echo "  pty-test        - Test PTY-based interception"
+	@echo "  pty-test        - Test PTY-based interception (press 'q' or Ctrl+C to exit)"
 	@echo "  dev             - Setup development environment"
 	@echo ""
 	@echo "Testing:"
