@@ -10,3 +10,4 @@ wheels/
 .venv
 
 git-repos/textual.log
+textual.log

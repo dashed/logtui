@@ -41,6 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed test data to use correct timestamp format (HH:MM:SS instead of full datetime)
 
 ### Fixed
+- **Service Toggle Bar styling**: Fixed height and visibility issues with compact checkbox layout
+- **Code quality checks**: Updated Makefile and ruff configuration to exclude git-repos directory
 - Integration test method signature compatibility with updated dummy app format
 - CSS parsing error: Changed `layers: base, overlay;` to `layers: base overlay;` following Textual CSS syntax
 - Reactive variable declarations moved from `__init__` to class level for proper Textual behavior

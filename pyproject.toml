@@ -26,3 +26,15 @@ dev = [
     "ruff>=0.12.4",
     "ty>=0.0.1a14",
 ]
+
+[tool.ruff]
+exclude = [
+    "git-repos",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".venv",
+    "build",
+    "dist",
+    "*.egg-info",
+]

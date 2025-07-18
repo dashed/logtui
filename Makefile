@@ -57,21 +57,21 @@ test-slow:
 
 # Lint code with ruff
 lint:
-	uv run ruff check .
+	uv run ruff check src/ tests/
 
 # Format code with ruff
 format:
-	uv run ruff format .
+	uv run ruff format src/ tests/
 
 # Type check with ty
 typecheck:
-	uv run ty check .
+	uv run ty check src/ tests/
 
 # Check code (lint + format check + type check)
 check:
-	uv run ruff check .
-	uv run ruff format --check .
-	uv run ty check .
+	uv run ruff check src/ tests/
+	uv run ruff format --check src/ tests/
+	uv run ty check src/ tests/
 
 # Clean up generated files
 clean:

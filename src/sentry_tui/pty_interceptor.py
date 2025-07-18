@@ -4,24 +4,24 @@ PTY-based interception for capturing process output while preserving terminal be
 This implementation follows the approach outlined in the feasibility document.
 """
 
-import pty
 import os
+import pty
+import re
 import select
+import signal
 import subprocess
 import sys
-import signal
 import threading
 import time
-import re
-from typing import List, Callable, Optional
-from textual.app import App, ComposeResult
-from textual.widgets import RichLog, Input, Footer, Header, Checkbox
-from textual.containers import Vertical, Horizontal
-from textual.reactive import reactive
-from textual.binding import Binding
-from textual.message import Message
-from rich.text import Text
+from typing import Callable, List, Optional
 
+from rich.text import Text
+from textual.app import App, ComposeResult
+from textual.binding import Binding
+from textual.containers import Horizontal, Vertical
+from textual.message import Message
+from textual.reactive import reactive
+from textual.widgets import Checkbox, Footer, Header, Input, RichLog
 
 # Regex used for ansi escape code splitting
 # Ref: https://github.com/chalk/ansi-regex/blob/f338e1814144efb950276aac84135ff86b72dc8e/index.js
@@ -147,21 +147,22 @@ SENTRY_SERVICE_COLORS = {
 
 class ServiceToggleBar(Horizontal):
     """A horizontal bar containing toggle checkboxes for each service."""
-    
+
     def __init__(self, services: List[str], **kwargs):
         super().__init__(**kwargs)
         self.services = services
         self.enabled_services = set(services)  # All services enabled by default
-    
+
     def compose(self) -> ComposeResult:
         """Compose the service toggle checkboxes."""
         for service in self.services:
             yield Checkbox(
-                f"[b]{service}[/b]", 
+                f"[b]{service}[/b]",
                 value=True,  # All services enabled by default
-                id=f"service_{service}"
+                id=f"service_{service}",
+                compact=True,
             )
-    
+
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
         if event.checkbox.id and event.checkbox.id.startswith("service_"):
@@ -170,18 +171,18 @@ class ServiceToggleBar(Horizontal):
                 self.enabled_services.add(service_name)
             else:
                 self.enabled_services.discard(service_name)
-            
+
             # Notify parent app about the change
             self.post_message(self.ServiceToggled(service_name, event.checkbox.value))
-    
+
     class ServiceToggled(Message):
         """Message sent when a service is toggled."""
-        
+
         def __init__(self, service: str, enabled: bool):
             self.service = service
             self.enabled = enabled
             super().__init__()
-    
+
     def is_service_enabled(self, service: str) -> bool:
         """Check if a service is enabled."""
         return service in self.enabled_services
@@ -411,6 +412,18 @@ class SentryTUIApp(App):
         color: $text;
         padding: 0 1;
     }
+    
+    #service_toggle_bar {
+        height: auto;
+        margin: 0;
+        padding: 0;
+    }
+    
+    #service_toggle_bar Checkbox {
+        margin: 0 1;
+        padding: 0;
+        width: auto;
+    }
     """
 
     BINDINGS = [
@@ -438,8 +451,7 @@ class SentryTUIApp(App):
         yield Vertical(
             Input(placeholder="Filter logs...", id="filter_input"),
             ServiceToggleBar(
-                services=list(SENTRY_SERVICE_COLORS.keys()),
-                id="service_toggle_bar"
+                services=list(SENTRY_SERVICE_COLORS.keys()), id="service_toggle_bar"
             ),
             RichLog(id="log_display", auto_scroll=True),
             id="main_container",
@@ -462,8 +474,10 @@ class SentryTUIApp(App):
         if event.input.id == "filter_input":
             self.filter_text = event.value
             self.update_log_display()
-    
-    def on_service_toggle_bar_service_toggled(self, event: ServiceToggleBar.ServiceToggled) -> None:
+
+    def on_service_toggle_bar_service_toggled(
+        self, event: ServiceToggleBar.ServiceToggled
+    ) -> None:
         """Handle service toggle events."""
         # Update the log display when service toggles change
         self.update_log_display()
@@ -489,7 +503,7 @@ class SentryTUIApp(App):
         service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
         if not service_toggle_bar.is_service_enabled(log_line.service):
             return False
-        
+
         # Check text filter
         if not self.filter_text:
             return True
