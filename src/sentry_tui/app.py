@@ -15,6 +15,29 @@ from .ui_components import CommandEditScreen, ProcessStatusBar, ServiceToggleBar
 from .utils import apply_rich_coloring
 
 
+class FilterInput(Input):
+    """Custom Input widget that allows certain keys to pass through to app bindings."""
+    
+    def check_consume_key(self, key: str, character: str | None) -> bool:
+        """Check if the widget may consume the given key.
+        
+        Allow 'l' and 'f' keys to pass through to app bindings for focus switching.
+        
+        Args:
+            key: A key identifier.
+            character: A character associated with the key, or `None` if there isn't one.
+            
+        Returns:
+            `True` if the widget may capture the key, or `False` if it should pass through.
+        """
+        # Allow 'l' and 'f' keys to pass through to app bindings
+        if key in ("l", "f"):
+            return False
+            
+        # For all other keys, use the default Input behavior
+        return character is not None and character.isprintable()
+
+
 class SentryTUIApp(App):
     """Main TUI application for intercepting and filtering Sentry devserver logs."""
 
@@ -113,7 +136,7 @@ class SentryTUIApp(App):
         """Compose the TUI layout."""
         yield Header()
         yield Vertical(
-            Input(placeholder="Filter logs...", id="filter_input"),
+            FilterInput(placeholder="Filter logs...", id="filter_input"),
             ServiceToggleBar(services=[], id="service_toggle_bar"),
             ProcessStatusBar(id="process_status_bar"),
             RichLog(id="log_display", auto_scroll=True),
@@ -136,7 +159,7 @@ class SentryTUIApp(App):
         self.interceptor.start()
 
         # Set up filter input handler
-        filter_input = self.query_one("#filter_input", Input)
+        filter_input = self.query_one("#filter_input", FilterInput)
         filter_input.focus()
 
         # Update initial process status
@@ -256,7 +279,7 @@ class SentryTUIApp(App):
 
     def action_focus_filter(self) -> None:
         """Focus the filter input."""
-        self.query_one("#filter_input", Input).focus()
+        self.query_one("#filter_input", FilterInput).focus()
 
     def action_focus_log(self) -> None:
         """Focus the log display."""
