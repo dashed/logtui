@@ -148,10 +148,10 @@ SENTRY_SERVICE_COLORS = {
 class ServiceToggleBar(Horizontal):
     """A horizontal bar containing toggle checkboxes for each service."""
 
-    def __init__(self, services: List[str], **kwargs):
+    def __init__(self, services: Optional[List[str]] = None, **kwargs):
         super().__init__(**kwargs)
-        self.services = services
-        self.enabled_services = set(services)  # All services enabled by default
+        self.services = list(services) if services else []
+        self.enabled_services = set(self.services)  # All services enabled by default
 
     def compose(self) -> ComposeResult:
         """Compose the service toggle checkboxes."""
@@ -162,6 +162,21 @@ class ServiceToggleBar(Horizontal):
                 id=f"service_{service}",
                 compact=True,
             )
+
+    def add_service(self, service: str) -> None:
+        """Add a new service to the toggle bar if it doesn't exist."""
+        if service not in self.services:
+            self.services.append(service)
+            self.enabled_services.add(service)  # New services enabled by default
+
+            # Add the checkbox widget
+            checkbox = Checkbox(
+                f"[b]{service}[/b]",
+                value=True,
+                id=f"service_{service}",
+                compact=True,
+            )
+            self.mount(checkbox)
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
@@ -444,15 +459,14 @@ class SentryTUIApp(App):
         self.command = command
         self.interceptor = None
         self.log_lines: List[LogLine] = []
+        self.discovered_services: set = set()
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
         yield Header()
         yield Vertical(
             Input(placeholder="Filter logs...", id="filter_input"),
-            ServiceToggleBar(
-                services=list(SENTRY_SERVICE_COLORS.keys()), id="service_toggle_bar"
-            ),
+            ServiceToggleBar(services=[], id="service_toggle_bar"),
             RichLog(id="log_display", auto_scroll=True),
             id="main_container",
         )
@@ -489,6 +503,11 @@ class SentryTUIApp(App):
             self.log_lines.append(log_line)
             self.line_count = len(self.log_lines)
 
+            # Discover new services dynamically
+            if log_line.service not in self.discovered_services:
+                self.discovered_services.add(log_line.service)
+                self.call_from_thread(self.add_service_to_toggle_bar, log_line.service)
+
             # Keep only the last 10,000 lines to prevent memory issues
             if len(self.log_lines) > 10000:
                 self.log_lines = self.log_lines[-10000:]
@@ -510,6 +529,11 @@ class SentryTUIApp(App):
 
         # Simple case-insensitive substring matching
         return self.filter_text.lower() in log_line.content.lower()
+
+    def add_service_to_toggle_bar(self, service: str) -> None:
+        """Add a new service to the toggle bar."""
+        service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
+        service_toggle_bar.add_service(service)
 
     def add_log_line(self, log_line: LogLine) -> None:
         """Add a log line to the display."""
