@@ -223,10 +223,10 @@ class EnhancedStatusBar(Horizontal):
 
     def compose(self) -> ComposeResult:
         """Compose the enhanced status bar."""
-        yield Static("", id="filter_indicator")
+        yield Static("Filter: [dim]none[/dim]", id="filter_indicator")
         yield Static("", id="spacer", classes="spacer")
-        yield Static("", id="line_counts")
-        yield Static("", id="service_count")
+        yield Static("Lines: [bold]0[/bold]", id="line_counts")
+        yield Static("Services: [dim]none[/dim]", id="service_count")
         yield Static("", id="performance_metrics")
 
     def update_status(

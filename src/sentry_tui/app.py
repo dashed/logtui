@@ -54,6 +54,10 @@ class SentryTUIApp(App):
         background: transparent;
     }
     
+    #main_container {
+        height: 1fr;
+    }
+    
     #log_display:focus {
         background: transparent;
         background-tint: transparent;
@@ -113,7 +117,7 @@ class SentryTUIApp(App):
         color: $text;
         padding: 0 1;
         border-top: solid $primary;
-        dock: bottom;
+        border-bottom: solid $primary;
     }
     
     #enhanced_status_bar Static {
@@ -175,9 +179,9 @@ class SentryTUIApp(App):
             ServiceToggleBar(services=[], id="service_toggle_bar"),
             ProcessStatusBar(id="process_status_bar"),
             RichLog(id="log_display", auto_scroll=True),
-            EnhancedStatusBar(id="enhanced_status_bar"),
             id="main_container",
         )
+        yield EnhancedStatusBar(id="enhanced_status_bar")
         yield Footer()
 
     def on_mount(self) -> None:
