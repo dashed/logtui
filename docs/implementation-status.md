@@ -36,8 +36,9 @@ This document tracks the current implementation status against the original feas
 - [x] **Main log display** with scrollable RichLog widget
 - [x] **Filter input bar** with real-time updates
 - [x] **Process management controls** (graceful/force shutdown, restart, auto-restart)
+- [x] **Command editing modal dialog** with current and previous command display
 - [x] **Process status bar** with real-time PID, state, and restart count display
-- [x] **Comprehensive keyboard shortcuts** (q=quit, f=focus filter, l=focus log, c=clear, p=pause, s=shutdown, k=kill, r=restart, a=auto-restart)
+- [x] **Comprehensive keyboard shortcuts** (q=quit, f=focus filter, l=focus log, c=clear, p=pause, s=shutdown, k=kill, r=restart, a=auto-restart, e=edit command)
 - [x] **Header and footer** with application title and shortcuts
 - [x] **Command-line interface** with help text, version info, and option parsing
 

@@ -17,6 +17,10 @@ Sentry TUI provides an interactive terminal interface for viewing and filtering 
   - **Graceful shutdown** and **force quit** operations
   - **Graceful restart** and **force restart** operations
   - **Auto-restart** functionality for crashed processes
+- **Command Editing**: Edit the command while the app is running (press `e`)
+  - Shows previous command after editing for reference
+  - Restart functionality uses the new command
+  - Auto-restart uses the new command if process crashes
 - **Process Status Bar**: Real-time display of process state, PID, restart count, and auto-restart status
 - **Service Recognition**: Automatically identifies and color-codes different services (server, worker, webpack, etc.)
 - **Rich Text Display**: Clean, colorized output using Rich library
@@ -146,6 +150,7 @@ Examples:
 - **`r`** - Restart devserver (graceful)
 - **`Shift+R`** - Force restart devserver
 - **`a`** - Toggle auto-restart functionality
+- **`e`** - Edit command (shows previous command after editing)
 
 ### Filtering
 

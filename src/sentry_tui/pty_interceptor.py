@@ -19,10 +19,11 @@ from typing import Callable, List, Optional
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical
 from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Checkbox, Footer, Header, Input, RichLog
+from textual.screen import ModalScreen
+from textual.widgets import Button, Checkbox, Footer, Header, Input, Label, RichLog, Static
 
 # Regex used for ansi escape code splitting
 # Ref: https://github.com/chalk/ansi-regex/blob/f338e1814144efb950276aac84135ff86b72dc8e/index.js
@@ -284,6 +285,91 @@ class ProcessStatusBar(Horizontal):
             info_parts.append(f"Command: {command}")
 
         process_info_display.update(" | ".join(info_parts))
+
+
+class CommandEditScreen(ModalScreen):
+    """Modal screen for editing the command."""
+
+    CSS = """
+    CommandEditScreen {
+        align: center middle;
+    }
+    
+    #edit_dialog {
+        width: 80%;
+        height: auto;
+        border: thick $primary 80%;
+        padding: 1;
+        background: $surface;
+    }
+    
+    #edit_title {
+        text-align: center;
+        margin-bottom: 1;
+        text-style: bold;
+    }
+    
+    #previous_command_label {
+        text-style: dim;
+        margin-bottom: 1;
+    }
+    
+    #command_input {
+        margin-bottom: 1;
+    }
+    
+    #edit_buttons {
+        align: center middle;
+        height: auto;
+    }
+    
+    #edit_buttons Button {
+        margin: 0 1;
+    }
+    """
+
+    def __init__(self, current_command: str, previous_command: str = "", **kwargs):
+        super().__init__(**kwargs)
+        self.current_command = current_command
+        self.previous_command = previous_command
+
+    def compose(self) -> ComposeResult:
+        """Compose the command edit dialog."""
+        with Container(id="edit_dialog"):
+            yield Label("Edit Command", id="edit_title")
+            
+            if self.previous_command:
+                yield Label(f"Previous: {self.previous_command}", id="previous_command_label")
+                
+            yield Input(
+                value=self.current_command,
+                placeholder="Enter command to run (e.g., getsentry devserver --workers)",
+                id="command_input"
+            )
+            
+            with Horizontal(id="edit_buttons"):
+                yield Button("Save", variant="primary", id="save_button")
+                yield Button("Cancel", variant="default", id="cancel_button")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses."""
+        if event.button.id == "save_button":
+            command_input = self.query_one("#command_input", Input)
+            new_command = command_input.value.strip()
+            if new_command:
+                self.dismiss(new_command)
+            else:
+                # Don't allow empty commands
+                pass
+        elif event.button.id == "cancel_button":
+            self.dismiss(None)
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle Enter key in the input field."""
+        if event.input.id == "command_input":
+            new_command = event.input.value.strip()
+            if new_command:
+                self.dismiss(new_command)
 
 
 class LogLine:
@@ -772,17 +858,22 @@ class SentryTUIApp(App):
         Binding("r", "restart", "Restart"),
         Binding("shift+r", "force_restart", "Force Restart"),
         Binding("a", "toggle_auto_restart", "Toggle Auto-restart"),
+        Binding("e", "edit_command", "Edit Command"),
     ]
 
     filter_text = reactive("")
     paused = reactive(False)
     line_count = reactive(0)
+    current_command = reactive("")
+    previous_command = reactive("")
     process_state = reactive(ProcessState.STOPPED)
     auto_restart_enabled = reactive(False)
 
     def __init__(self, command: List[str], auto_restart: bool = False):
         super().__init__()
         self.command = command
+        self.current_command = " ".join(command)  # Initialize reactive variable
+        self.previous_command = ""  # No previous command initially
         self.interceptor = None
         self.log_lines: List[LogLine] = []
         self.discovered_services: set = set()
@@ -960,6 +1051,28 @@ class SentryTUIApp(App):
             self.interceptor.toggle_auto_restart()
             # Force an immediate status update
             self.update_process_status()
+
+    async def action_edit_command(self) -> None:
+        """Edit the command to be run."""
+        def update_command(new_command: str) -> None:
+            if new_command is not None:
+                # Store previous command
+                self.previous_command = self.current_command
+                # Parse new command into list
+                new_command_list = new_command.split()
+                self.command = new_command_list
+                self.current_command = new_command
+                # Update the interceptor if it exists
+                if self.interceptor:
+                    self.interceptor.command = new_command_list
+                # Update status display
+                self.update_process_status()
+
+        # Show the edit dialog
+        result = await self.push_screen(
+            CommandEditScreen(self.current_command, self.previous_command),
+            update_command
+        )
 
     def action_focus_filter(self) -> None:
         """Focus the filter input."""
