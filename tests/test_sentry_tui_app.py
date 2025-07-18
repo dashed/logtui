@@ -149,31 +149,34 @@ class TestSentryTUIApp:
                 mock_quit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_key_binding_focus_filter(self, mock_interceptor):
-        """Test that 'f' key focuses the filter input."""
+    async def test_key_binding_focus_cycle(self, mock_interceptor):
+        """Test that 'tab' key cycles focus between elements."""
         command = ["test", "command"]
         app = SentryTUIApp(command)
 
         async with app.run_test() as pilot:
-            # Focus the log display first
-            log_display = app.query_one("#log_display", RichLog)
-            log_display.focus()
-            await pilot.pause()  # Wait for focus to update
-
-            # Verify log display is focused
-            assert log_display.has_focus
-
-            # Press 'f' to focus filter
-            await pilot.press("f")
-            await pilot.pause()  # Wait for focus to update
-
-            # Verify filter input is now focused
+            # Start with filter input focused (default)
             filter_input = app.query_one("#filter_input", Input)
             assert filter_input.has_focus
 
+            # Press 'tab' to cycle to log display
+            await pilot.press("tab")
+            await pilot.pause()  # Wait for focus to update
+
+            # Verify log display is now focused
+            log_display = app.query_one("#log_display", RichLog)
+            assert log_display.has_focus
+
+            # Press 'tab' again to cycle back to filter input
+            await pilot.press("tab")
+            await pilot.pause()  # Wait for focus to update
+
+            # Verify filter input is focused again
+            assert filter_input.has_focus
+
     @pytest.mark.asyncio
-    async def test_action_focus_log(self, mock_interceptor):
-        """Test that focus_log action focuses the log display."""
+    async def test_action_focus_next(self, mock_interceptor):
+        """Test that focus_next action cycles focus to the next element."""
         command = ["test", "command"]
         app = SentryTUIApp(command)
 
@@ -182,13 +185,58 @@ class TestSentryTUIApp:
             filter_input = app.query_one("#filter_input", Input)
             assert filter_input.has_focus
 
-            # Call focus_log action directly
-            app.action_focus_log()
+            # Call focus_next action directly
+            app.action_focus_next()
             await pilot.pause()  # Wait for focus to update
 
             # Verify log display is now focused
             log_display = app.query_one("#log_display", RichLog)
             assert log_display.has_focus
+
+    @pytest.mark.asyncio
+    async def test_key_binding_focus_previous(self, mock_interceptor):
+        """Test that 'shift+tab' key cycles focus backwards."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Start with filter input focused (default)
+            filter_input = app.query_one("#filter_input", Input)
+            assert filter_input.has_focus
+
+            # Press 'shift+tab' to cycle backwards to log display
+            await pilot.press("shift+tab")
+            await pilot.pause()  # Wait for focus to update
+
+            # Verify log display is now focused
+            log_display = app.query_one("#log_display", RichLog)
+            assert log_display.has_focus
+
+            # Press 'shift+tab' again to cycle back to filter input
+            await pilot.press("shift+tab")
+            await pilot.pause()  # Wait for focus to update
+
+            # Verify filter input is focused again
+            assert filter_input.has_focus
+
+    @pytest.mark.asyncio
+    async def test_key_binding_focus_app_escape(self, mock_interceptor):
+        """Test that 'escape' key unfocuses current element."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Start with filter input focused (default)
+            filter_input = app.query_one("#filter_input", Input)
+            assert filter_input.has_focus
+
+            # Press 'escape' to unfocus
+            await pilot.press("escape")
+            await pilot.pause()  # Wait for focus to update
+
+            # Verify filter input is no longer focused
+            # (focus may move to another element in Textual)
+            assert not filter_input.has_focus
 
     @pytest.mark.asyncio
     async def test_action_clear_logs(self, mock_interceptor):

@@ -17,12 +17,13 @@ from .utils import apply_rich_coloring
 
 
 class FilterInput(Input):
-    """Custom Input widget that allows certain keys to pass through to app bindings."""
+    """Custom Input widget for filtering logs."""
 
     def check_consume_key(self, key: str, character: str | None) -> bool:
         """Check if the widget may consume the given key.
 
-        Allow 'l' and 'f' keys to pass through to app bindings for focus switching.
+        When focused, the input should consume all printable characters.
+        When not focused, app bindings (like 'f' and 'l') work normally.
 
         Args:
             key: A key identifier.
@@ -31,11 +32,7 @@ class FilterInput(Input):
         Returns:
             `True` if the widget may capture the key, or `False` if it should pass through.
         """
-        # Allow 'l' and 'f' keys to pass through to app bindings
-        if key in ("l", "f"):
-            return False
-
-        # For all other keys, use the default Input behavior
+        # Use default Input behavior - consume all printable characters when focused
         return character is not None and character.isprintable()
 
 
@@ -125,8 +122,9 @@ class SentryTUIApp(App):
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("ctrl+c", "quit", "Quit", priority=True),
-        Binding("f", "focus_filter", "Focus Filter", priority=True),
-        Binding("l", "focus_log", "Focus Log", priority=True),
+        Binding("tab", "focus_next", "Focus Next", priority=True),
+        Binding("shift+tab", "focus_previous", "Focus Previous", priority=True),
+        Binding("escape", "focus_app", "Focus App", priority=True),
         Binding("c", "clear_logs", "Clear Logs", priority=True),
         Binding("p", "toggle_pause", "Pause/Resume", priority=True),
         Binding("s", "graceful_shutdown", "Graceful Shutdown", priority=True),
@@ -390,13 +388,34 @@ class SentryTUIApp(App):
             self.interceptor.stop()
         self.exit()
 
-    def action_focus_filter(self) -> None:
-        """Focus the filter input."""
-        self.query_one("#filter_input", FilterInput).focus()
+    def action_focus_next(self) -> None:
+        """Focus the next focusable element."""
+        if self.focused is None:
+            # No focus - start with filter input
+            self.query_one("#filter_input", FilterInput).focus()
+        elif self.focused.id == "filter_input":
+            # From filter input - go to log display
+            self.query_one("#log_display", RichLog).focus()
+        else:
+            # From log display or other - go to filter input
+            self.query_one("#filter_input", FilterInput).focus()
 
-    def action_focus_log(self) -> None:
-        """Focus the log display."""
-        self.query_one("#log_display", RichLog).focus()
+    def action_focus_previous(self) -> None:
+        """Focus the previous focusable element."""
+        if self.focused is None:
+            # No focus - start with log display
+            self.query_one("#log_display", RichLog).focus()
+        elif self.focused.id == "log_display":
+            # From log display - go to filter input
+            self.query_one("#filter_input", FilterInput).focus()
+        else:
+            # From filter input or other - go to log display
+            self.query_one("#log_display", RichLog).focus()
+
+    def action_focus_app(self) -> None:
+        """Unfocus current element and return to app-level focus."""
+        if self.focused is not None:
+            self.focused.blur()
 
     def action_clear_logs(self) -> None:
         """Clear all logs."""

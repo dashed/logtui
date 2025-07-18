@@ -46,6 +46,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Seamless integration with existing filter and service toggle systems
   - Consistent theming using $surface background and $accent borders
   - Compact layout with no gaps between UI elements
+- **Improved Focus Management**: Enhanced keyboard navigation with better key bindings
+  - Replaced conflicting 'f' and 'l' key bindings with Tab/Shift+Tab focus cycling
+  - Added Escape key to unfocus current element and return to app-level focus
+  - Fixed FilterInput widget to allow typing all letters including 'f' and 'l'
+  - Maintained full keyboard navigation while eliminating typing conflicts
 - **Process Management**: Complete process lifecycle control without restarting sentry-tui
   - **Graceful shutdown**: Send SIGTERM to devserver process (key: `s`)
   - **Force quit**: Send SIGKILL to devserver process (key: `k`)
@@ -177,8 +182,9 @@ sentry-tui --help                                      # Show help
 
 ### Keyboard Shortcuts
 - `q` or `Ctrl+C` - Quit application
-- `f` - Focus filter input
-- `l` - Focus log display
+- `Tab` - Focus next element (filter input ↔ log display)
+- `Shift+Tab` - Focus previous element (log display ↔ filter input)
+- `Escape` - Unfocus current element and return to app-level focus
 - `c` - Clear all logs
 - `p` - Toggle pause/resume log capture
 - `s` - Graceful shutdown devserver
