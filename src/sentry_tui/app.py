@@ -172,40 +172,55 @@ class SentryTUIApp(App):
 
         # Add to our log storage with memory management
         self.log_lines.append(log_line)
+        
+        # Keep only the last max_lines to prevent memory issues
         if len(self.log_lines) > self.max_lines:
-            self.log_lines.pop(0)  # Remove oldest line
+            self.log_lines = self.log_lines[-self.max_lines:]
 
         # Discover new services dynamically
         if log_line.service not in self.discovered_services:
             self.discovered_services.add(log_line.service)
-            self.add_service_to_toggle_bar(log_line.service)
+            self.call_from_thread(self.add_service_to_toggle_bar, log_line.service)
 
         # Update display if line matches current filter
         if self.matches_filter(log_line):
-            log_display = self.query_one("#log_display", RichLog)
-            # Apply Rich-based coloring
-            colored_text = apply_rich_coloring(line)
-            log_display.write(colored_text)
+            self.call_from_thread(self.add_log_line, log_line)
 
         self.line_count = len(self.log_lines)
 
     def matches_filter(self, log_line: LogLine) -> bool:
-        """Check if a log line matches the current filter criteria."""
-        # Text filter
-        if self.filter_text and self.filter_text.lower() not in log_line.content.lower():
-            return False
+        """Check if a log line matches the current filter."""
+        # Check if service is enabled in toggle bar (only if app is running)
+        try:
+            service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
 
-        # Service filter - check if service is enabled in toggle bar
-        service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
-        if not service_toggle_bar.is_service_enabled(log_line.service):
-            return False
+            # If no services have been discovered yet, allow all services
+            if not service_toggle_bar.services:
+                pass  # Skip service filtering when no services are available
+            elif not service_toggle_bar.is_service_enabled(log_line.service):
+                return False
+        except Exception:
+            # If service toggle bar is not available (e.g., in tests), skip service filtering
+            pass
 
-        return True
+        # Check text filter
+        if not self.filter_text:
+            return True
+
+        # Simple case-insensitive substring matching
+        return self.filter_text.lower() in log_line.content.lower()
 
     def add_service_to_toggle_bar(self, service: str) -> None:
         """Add a new service to the toggle bar."""
         service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
         service_toggle_bar.add_service(service)
+
+    def add_log_line(self, log_line: LogLine) -> None:
+        """Add a log line to the display."""
+        log_display = self.query_one("#log_display", RichLog)
+        # Apply Rich-based coloring instead of ANSI codes
+        colored_text = apply_rich_coloring(log_line.content.rstrip("\n"))
+        log_display.write(colored_text, scroll_end=True)
 
     def update_log_display(self) -> None:
         """Update the log display based on current filters."""
@@ -215,10 +230,13 @@ class SentryTUIApp(App):
         # Re-display all matching lines
         for log_line in self.log_lines:
             if self.matches_filter(log_line):
-                colored_text = apply_rich_coloring(log_line.content)
-                log_display.write(colored_text)
+                colored_text = apply_rich_coloring(log_line.content.rstrip("\n"))
+                log_display.write(colored_text, scroll_end=False)
 
-    async def action_quit(self) -> None:
+        # Scroll to end after all lines are added
+        log_display.scroll_end()
+
+    def action_quit(self) -> None:
         """Quit the application."""
         if self.interceptor:
             self.interceptor.stop()
@@ -290,3 +308,8 @@ class SentryTUIApp(App):
             CommandEditScreen(self.current_command, self.previous_command),
             update_command
         )
+
+    def on_unmount(self) -> None:
+        """Clean up when the app unmounts."""
+        if self.interceptor:
+            self.interceptor.stop()

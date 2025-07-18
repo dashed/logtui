@@ -24,7 +24,8 @@ class ServiceToggleBar(Horizontal):
 
     def __init__(self, services: Optional[List[str]] = None, **kwargs):
         super().__init__(**kwargs)
-        self.services = services or []
+        self.services = list(services) if services else []
+        self.enabled_services = set(self.services)  # All services enabled by default
 
     def compose(self) -> ComposeResult:
         """Compose the service toggle bar."""
@@ -38,6 +39,7 @@ class ServiceToggleBar(Horizontal):
         """Add a new service toggle if it doesn't exist."""
         if service not in self.services:
             self.services.append(service)
+            self.enabled_services.add(service)  # New services enabled by default
             
             # Remove placeholder if it exists
             try:
@@ -46,23 +48,26 @@ class ServiceToggleBar(Horizontal):
             except:
                 pass  # Placeholder doesn't exist
             
-            # Add new checkbox
-            new_checkbox = Checkbox(service, value=True, id=f"service_{service}")
-            self.mount(new_checkbox)
+            # Add new checkbox widget only if the widget is mounted
+            if self.is_mounted:
+                new_checkbox = Checkbox(service, value=True, id=f"service_{service}")
+                self.mount(new_checkbox)
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
         if event.checkbox.id and event.checkbox.id.startswith("service_"):
-            service = event.checkbox.id[8:]  # Remove "service_" prefix
-            self.post_message(self.ServiceToggled(service, event.value))
+            service_name = event.checkbox.id.replace("service_", "")
+            if event.checkbox.value:
+                self.enabled_services.add(service_name)
+            else:
+                self.enabled_services.discard(service_name)
+            
+            # Notify parent app about the change
+            self.post_message(self.ServiceToggled(service_name, event.checkbox.value))
 
     def is_service_enabled(self, service: str) -> bool:
         """Check if a service is currently enabled."""
-        try:
-            checkbox = self.query_one(f"#service_{service}", Checkbox)
-            return checkbox.value
-        except:
-            return True  # Default to enabled if checkbox doesn't exist
+        return service in self.enabled_services
 
 
 class ProcessStatusBar(Horizontal):

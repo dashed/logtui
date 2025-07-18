@@ -19,7 +19,7 @@ class TestSentryTUIApp:
     def mock_interceptor(self):
         """Mock PTYInterceptor for testing."""
         with patch(
-            "sentry_tui.pty_interceptor.PTYInterceptor"
+            "sentry_tui.app.PTYInterceptor"
         ) as mock_interceptor_class:
             mock_interceptor = Mock()
             # Configure get_status to return a proper dictionary
@@ -620,7 +620,7 @@ class TestProcessControlActions:
     def mock_interceptor(self):
         """Mock PTYInterceptor for testing."""
         with patch(
-            "sentry_tui.pty_interceptor.PTYInterceptor"
+            "sentry_tui.app.PTYInterceptor"
         ) as mock_interceptor_class:
             mock_interceptor = Mock()
             mock_interceptor.get_status.return_value = {
