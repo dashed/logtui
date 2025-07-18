@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import Mock, patch
 from textual.widgets import Input, RichLog
-from sentry_tui.pty_interceptor import SentryTUIApp, LogLine
+from sentry_tui.pty_interceptor import SentryTUIApp, LogLine, ServiceToggleBar
 
 
 class TestSentryTUIApp:
@@ -285,7 +285,8 @@ class TestSentryTUIApp:
                     assert app.line_count == 1
 
                     # Verify call_from_thread was called to update display
-                    mock_call_from_thread.assert_called_once()
+                    # Should be called twice: once for service discovery, once for log display
+                    assert mock_call_from_thread.call_count == 2
 
     @pytest.mark.asyncio
     async def test_handle_log_output_when_paused(self, mock_interceptor):
@@ -333,7 +334,8 @@ class TestSentryTUIApp:
                     assert app.log_lines[0].content == matching_line
 
                     # Verify call_from_thread was called to update display
-                    mock_call_from_thread.assert_called_once()
+                    # Should be called twice: once for service discovery, once for log display
+                    assert mock_call_from_thread.call_count == 2
 
                     # Reset mocks
                     mock_call_from_thread.reset_mock()
@@ -372,7 +374,8 @@ class TestSentryTUIApp:
                 assert app.log_lines[-1].content == "New log line\n"
 
                 # Verify call_from_thread was called
-                mock_call_from_thread.assert_called_once()
+                # Should be called twice: once for service discovery, once for log display
+                assert mock_call_from_thread.call_count == 2
 
     @pytest.mark.asyncio
     async def test_update_log_display_with_filter(self, mock_interceptor):
@@ -426,3 +429,174 @@ class TestSentryTUIApp:
 
             # Verify interceptor was stopped
             interceptor.stop.assert_called_once()  # type: ignore
+
+
+class TestServiceToggleBar:
+    """Test cases for ServiceToggleBar dynamic service discovery."""
+
+    @pytest.mark.asyncio
+    async def test_service_toggle_bar_starts_empty(self):
+        """Test that ServiceToggleBar starts with empty services list."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            service_toggle_bar = app.query_one("#service_toggle_bar", ServiceToggleBar)
+            assert service_toggle_bar.services == []
+            assert service_toggle_bar.enabled_services == set()
+
+    @pytest.mark.asyncio
+    async def test_dynamic_service_discovery(self):
+        """Test that services are discovered dynamically from log lines."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock call_from_thread to avoid threading issues
+            with patch.object(app, "call_from_thread") as mock_call_from_thread:
+                # Simulate log lines with different services
+                test_logs = [
+                    "server 01:23:45 [INFO] django.request: GET /api/health",
+                    "worker 01:23:46 [DEBUG] celery.worker: Task received",
+                    "webpack 01:23:47 [INFO] webpack: Compiled successfully",
+                    "custom-service 01:23:48 [ERROR] custom.module: Something failed",
+                ]
+
+                for log_line in test_logs:
+                    app.handle_log_output(log_line)
+
+                # Verify services were discovered
+                assert "server" in app.discovered_services
+                assert "worker" in app.discovered_services
+                assert "webpack" in app.discovered_services
+                assert "custom-service" in app.discovered_services
+
+                # Verify call_from_thread was called to add services
+                # Should be called for each new service + each log line display
+                assert mock_call_from_thread.call_count >= 4
+
+    @pytest.mark.asyncio
+    async def test_service_toggle_bar_add_service(self):
+        """Test adding a service to ServiceToggleBar."""
+        service_toggle_bar = ServiceToggleBar()
+
+        # Initially empty
+        assert service_toggle_bar.services == []
+        assert service_toggle_bar.enabled_services == set()
+
+        # Add a service
+        service_toggle_bar.add_service("test-service")
+
+        # Verify service was added
+        assert "test-service" in service_toggle_bar.services
+        assert "test-service" in service_toggle_bar.enabled_services
+
+    @pytest.mark.asyncio
+    async def test_service_toggle_bar_add_duplicate_service(self):
+        """Test that adding duplicate service doesn't create duplicates."""
+        service_toggle_bar = ServiceToggleBar()
+
+        # Add same service twice
+        service_toggle_bar.add_service("test-service")
+        service_toggle_bar.add_service("test-service")
+
+        # Verify only one instance exists
+        assert service_toggle_bar.services.count("test-service") == 1
+        assert "test-service" in service_toggle_bar.enabled_services
+
+    @pytest.mark.asyncio
+    async def test_service_filtering_with_discovered_services(self):
+        """Test that filtering works with dynamically discovered services."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock the service toggle bar interaction
+            service_toggle_bar = app.query_one("#service_toggle_bar", ServiceToggleBar)
+
+            # Add some services manually (simulating discovery)
+            service_toggle_bar.add_service("server")
+            service_toggle_bar.add_service("worker")
+            service_toggle_bar.add_service("custom-service")
+
+            # Create test log lines
+            server_log = LogLine(
+                "server 01:23:45 [INFO] django.request: GET /api/health"
+            )
+            worker_log = LogLine("worker 01:23:46 [DEBUG] celery.worker: Task received")
+            custom_log = LogLine(
+                "custom-service 01:23:48 [ERROR] custom.module: Something failed"
+            )
+
+            # All services enabled by default - all should match
+            assert app.matches_filter(server_log)
+            assert app.matches_filter(worker_log)
+            assert app.matches_filter(custom_log)
+
+            # Disable worker service
+            service_toggle_bar.enabled_services.discard("worker")
+
+            # Only server and custom-service should match
+            assert app.matches_filter(server_log)
+            assert not app.matches_filter(worker_log)
+            assert app.matches_filter(custom_log)
+
+    @pytest.mark.asyncio
+    async def test_add_service_to_toggle_bar_method(self):
+        """Test the add_service_to_toggle_bar method."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            service_toggle_bar = app.query_one("#service_toggle_bar", ServiceToggleBar)
+
+            # Initially empty
+            assert service_toggle_bar.services == []
+
+            # Add service through app method
+            app.add_service_to_toggle_bar("new-service")
+
+            # Verify service was added
+            assert "new-service" in service_toggle_bar.services
+            assert "new-service" in service_toggle_bar.enabled_services
+
+    @pytest.mark.asyncio
+    async def test_discovered_services_set_prevents_duplicates(self):
+        """Test that discovered_services set prevents duplicate discovery."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock call_from_thread to count calls
+            with patch.object(app, "call_from_thread") as mock_call_from_thread:
+                # Add same service multiple times
+                app.handle_log_output("server 01:23:45 [INFO] First log")
+                app.handle_log_output("server 01:23:46 [INFO] Second log")
+                app.handle_log_output("server 01:23:47 [INFO] Third log")
+
+                # Verify service was only discovered once
+                assert "server" in app.discovered_services
+                assert app.discovered_services == {"server"}
+
+                # call_from_thread should be called once for service addition
+                # and once for each log line display that matches the filter
+                # But only the first log line triggers service discovery
+                assert mock_call_from_thread.call_count >= 1
+
+    @pytest.mark.asyncio
+    async def test_unknown_service_discovery(self):
+        """Test that unknown services are discovered correctly."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock call_from_thread to avoid threading issues
+            with patch.object(app, "call_from_thread") as mock_call_from_thread:
+                # Log line that doesn't match standard format
+                app.handle_log_output("Some random log line without service")
+
+                # Verify "unknown" service was discovered
+                assert "unknown" in app.discovered_services
+
+                # Verify call_from_thread was called
+                mock_call_from_thread.assert_called()

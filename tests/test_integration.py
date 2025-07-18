@@ -39,7 +39,14 @@ class TestIntegration:
 
         # Test random log message generation
         service, level, module, message = app._get_random_log_message()
-        assert service in ["server", "worker", "celery-beat", "webpack", "taskworker"]
+        assert service in [
+            "server",
+            "worker",
+            "celery-beat",
+            "webpack",
+            "taskworker",
+            "getsentry-outcomes",
+        ]
         assert level in ["DEBUG", "INFO", "WARNING", "ERROR"]
         assert isinstance(module, str)
         assert isinstance(message, str)

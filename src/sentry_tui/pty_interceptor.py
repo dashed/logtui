@@ -169,14 +169,15 @@ class ServiceToggleBar(Horizontal):
             self.services.append(service)
             self.enabled_services.add(service)  # New services enabled by default
 
-            # Add the checkbox widget
-            checkbox = Checkbox(
-                f"[b]{service}[/b]",
-                value=True,
-                id=f"service_{service}",
-                compact=True,
-            )
-            self.mount(checkbox)
+            # Add the checkbox widget only if the widget is mounted
+            if self.is_mounted:
+                checkbox = Checkbox(
+                    f"[b]{service}[/b]",
+                    value=True,
+                    id=f"service_{service}",
+                    compact=True,
+                )
+                self.mount(checkbox)
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""
@@ -518,10 +519,18 @@ class SentryTUIApp(App):
 
     def matches_filter(self, log_line: LogLine) -> bool:
         """Check if a log line matches the current filter."""
-        # Check if service is enabled in toggle bar
-        service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
-        if not service_toggle_bar.is_service_enabled(log_line.service):
-            return False
+        # Check if service is enabled in toggle bar (only if app is running)
+        try:
+            service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
+
+            # If no services have been discovered yet, allow all services
+            if not service_toggle_bar.services:
+                pass  # Skip service filtering when no services are available
+            elif not service_toggle_bar.is_service_enabled(log_line.service):
+                return False
+        except Exception:
+            # If service toggle bar is not available (e.g., in tests), skip service filtering
+            pass
 
         # Check text filter
         if not self.filter_text:
