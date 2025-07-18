@@ -209,25 +209,17 @@ class ProcessStatusBar(Horizontal):
         process_info_display.update(" | ".join(info_parts))
 
 
-class EnhancedStatusBar(Horizontal):
+class EnhancedStatusBar(Static):
     """Enhanced status bar showing comprehensive information."""
 
     def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+        super().__init__("ENHANCED STATUS BAR VISIBLE - Filter: none | Lines: 0 | Services: none", **kwargs)
         self.total_lines = 0
         self.filtered_lines = 0
         self.active_filter = ""
         self.service_count = 0
         self.logs_per_sec = 0
         self.memory_usage = 0
-
-    def compose(self) -> ComposeResult:
-        """Compose the enhanced status bar."""
-        yield Static("Filter: [dim]none[/dim]", id="filter_indicator")
-        yield Static("", id="spacer", classes="spacer")
-        yield Static("Lines: [bold]0[/bold]", id="line_counts")
-        yield Static("Services: [dim]none[/dim]", id="service_count")
-        yield Static("", id="performance_metrics")
 
     def update_status(
         self,
@@ -246,40 +238,29 @@ class EnhancedStatusBar(Horizontal):
         self.logs_per_sec = logs_per_sec
         self.memory_usage = memory_usage
 
-        # Update filter indicator
-        filter_display = self.query_one("#filter_indicator", Static)
-        if active_filter:
-            filter_display.update(f"Filter: [bold]{active_filter}[/bold]")
-        else:
-            filter_display.update("Filter: [dim]none[/dim]")
-
-        # Update line counts
-        line_counts_display = self.query_one("#line_counts", Static)
+        # Build the status text
+        filter_text = f"Filter: [bold]{active_filter}[/bold]" if active_filter else "Filter: [dim]none[/dim]"
+        
         if active_filter and filtered_lines != total_lines:
-            line_counts_display.update(
-                f"Lines: [bold]{filtered_lines:,}[/bold] / {total_lines:,}"
-            )
+            line_text = f"Lines: [bold]{filtered_lines:,}[/bold] / {total_lines:,}"
         else:
-            line_counts_display.update(f"Lines: [bold]{total_lines:,}[/bold]")
-
-        # Update service count
-        service_count_display = self.query_one("#service_count", Static)
-        if service_count > 0:
-            service_count_display.update(f"Services: [bold]{service_count}[/bold]")
-        else:
-            service_count_display.update("Services: [dim]none[/dim]")
-
-        # Update performance metrics
-        performance_display = self.query_one("#performance_metrics", Static)
-        if logs_per_sec > 0 or memory_usage > 0:
-            metrics_parts = []
-            if logs_per_sec > 0:
-                metrics_parts.append(f"{logs_per_sec:.1f}/s")
-            if memory_usage > 0:
-                metrics_parts.append(f"{memory_usage}MB")
-            performance_display.update(" | ".join(metrics_parts))
-        else:
-            performance_display.update("")
+            line_text = f"Lines: [bold]{total_lines:,}[/bold]"
+            
+        service_text = f"Services: [bold]{service_count}[/bold]" if service_count > 0 else "Services: [dim]none[/dim]"
+        
+        metrics_parts = []
+        if logs_per_sec > 0:
+            metrics_parts.append(f"{logs_per_sec:.1f}/s")
+        if memory_usage > 0:
+            metrics_parts.append(f"{memory_usage}MB")
+        metrics_text = " | ".join(metrics_parts) if metrics_parts else ""
+        
+        # Update the Static widget content
+        status_parts = [filter_text, line_text, service_text]
+        if metrics_text:
+            status_parts.append(metrics_text)
+        
+        self.update(" | ".join(status_parts))
 
 
 class CommandEditScreen(ModalScreen):

@@ -7,12 +7,12 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, RichLog
+from textual.widgets import Footer, Header, Input, RichLog, Static
 
 from .constants import ProcessState
 from .log_processing import LogLine
 from .pty_core import PTYInterceptor
-from .ui_components import CommandEditScreen, EnhancedStatusBar, ProcessStatusBar, ServiceToggleBar
+from .ui_components import CommandEditScreen, ProcessStatusBar, ServiceToggleBar
 from .utils import apply_rich_coloring
 
 
@@ -113,21 +113,12 @@ class SentryTUIApp(App):
     
     #enhanced_status_bar {
         height: 1;
-        background: $surface;
+        background: $primary;
         color: $text;
         padding: 0 1;
-        border-top: solid $primary;
-        border-bottom: solid $primary;
-    }
-    
-    #enhanced_status_bar Static {
-        margin: 0 1;
-        padding: 0;
-        width: auto;
-    }
-    
-    #enhanced_status_bar .spacer {
-        width: 1fr;
+        border-top: solid $accent;
+        border-bottom: solid $accent;
+        text-style: bold;
     }
     """
 
@@ -174,6 +165,7 @@ class SentryTUIApp(App):
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
         yield Header()
+        yield Static("Filter: none | Lines: 0 | Services: none", id="enhanced_status_bar")
         yield Vertical(
             FilterInput(placeholder="Filter logs...", id="filter_input"),
             ServiceToggleBar(services=[], id="service_toggle_bar"),
@@ -181,7 +173,6 @@ class SentryTUIApp(App):
             RichLog(id="log_display", auto_scroll=True),
             id="main_container",
         )
-        yield EnhancedStatusBar(id="enhanced_status_bar")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -238,7 +229,7 @@ class SentryTUIApp(App):
     def update_enhanced_status_bar(self) -> None:
         """Update the enhanced status bar with current metrics."""
         try:
-            enhanced_status_bar = self.query_one("#enhanced_status_bar", EnhancedStatusBar)
+            enhanced_status_bar = self.query_one("#enhanced_status_bar", Static)
             
             # Calculate filtered line count
             filtered_count = 0
@@ -251,19 +242,34 @@ class SentryTUIApp(App):
             current_time = time.time()
             # Remove timestamps older than 10 seconds
             self.log_timestamps = [ts for ts in self.log_timestamps if current_time - ts <= 10]
-            logs_per_sec = len(self.log_timestamps) / min(10, max(1, current_time - self.last_log_time))
+            logs_per_sec = len(self.log_timestamps) / min(10, max(1, current_time - self.last_log_time)) if self.log_timestamps else 0
             
             # Get basic memory usage estimate (number of lines * rough estimate per line)
             memory_usage = len(self.log_lines) * 0.001  # Rough estimate: 1KB per line
             
-            enhanced_status_bar.update_status(
-                total_lines=self.line_count,
-                filtered_lines=self.filtered_line_count,
-                active_filter=self.filter_text,
-                service_count=len(self.discovered_services),
-                logs_per_sec=logs_per_sec,
-                memory_usage=int(memory_usage),
-            )
+            # Build the status text
+            filter_text = f"Filter: [bold]{self.filter_text}[/bold]" if self.filter_text else "Filter: [dim]none[/dim]"
+            
+            if self.filter_text and filtered_count != self.line_count:
+                line_text = f"Lines: [bold]{filtered_count:,}[/bold] / {self.line_count:,}"
+            else:
+                line_text = f"Lines: [bold]{self.line_count:,}[/bold]"
+                
+            service_count = len(self.discovered_services)
+            service_text = f"Services: [bold]{service_count}[/bold]" if service_count > 0 else "Services: [dim]none[/dim]"
+            
+            metrics_parts = []
+            if logs_per_sec > 0:
+                metrics_parts.append(f"{logs_per_sec:.1f}/s")
+            if memory_usage > 0:
+                metrics_parts.append(f"{memory_usage:.1f}MB")
+            
+            # Update the Static widget content
+            status_parts = [filter_text, line_text, service_text]
+            if metrics_parts:
+                status_parts.append(" | ".join(metrics_parts))
+            
+            enhanced_status_bar.update(" | ".join(status_parts))
         except Exception:
             # If enhanced status bar is not available, skip silently
             pass
