@@ -15,23 +15,25 @@ import time
 from typing import List, Callable, Optional
 from textual.app import App, ComposeResult
 from textual.widgets import RichLog, Input, Footer, Header
-from textual.containers import Vertical, Horizontal
+from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.binding import Binding
 
 
 class LogLine:
     """Represents a single log line with metadata."""
-    def __init__(self, content: str, timestamp: float = None):
+
+    def __init__(self, content: str, timestamp: Optional[float] = None):
         self.content = content
         self.timestamp = timestamp or time.time()
         self.service = self._extract_service()
-    
+
     def _extract_service(self) -> str:
         """Extract service name from Honcho-style log line."""
         # Look for service name pattern: "  service_name | timestamp message"
         import re
-        match = re.match(r'\s*(\w+)\s+\|\s+', self.content)
+
+        match = re.match(r"\s*(\w+)\s+\|\s+", self.content)
         if match:
             return match.group(1)
         return "unknown"
@@ -39,8 +41,10 @@ class LogLine:
 
 class PTYInterceptor:
     """PTY-based process interceptor that captures output while preserving terminal behavior."""
-    
-    def __init__(self, command: List[str], on_output: Callable[[str], None] = None):
+
+    def __init__(
+        self, command: List[str], on_output: Optional[Callable[[str], None]] = None
+    ):
         self.command = command
         self.on_output = on_output or self._default_output_handler
         self.process = None
@@ -49,39 +53,40 @@ class PTYInterceptor:
         self.running = False
         self.output_thread = None
         self.buffer = ""
-        
+
     def _default_output_handler(self, line: str):
         """Default output handler that prints to stdout."""
-        print(line, end='')
-    
+        print(line, end="")
+
     def start(self):
         """Start the PTY-based interception."""
         # Create a pseudo-terminal
         self.master_fd, self.slave_fd = pty.openpty()
-        
+
         # Start the subprocess with PTY
         self.process = subprocess.Popen(
             self.command,
             stdin=self.slave_fd,
             stdout=self.slave_fd,
             stderr=self.slave_fd,
-            start_new_session=True
+            start_new_session=True,
         )
-        
+
         # Close the slave fd in the parent process
         os.close(self.slave_fd)
-        
+
         # Set up non-blocking I/O
         import fcntl
+
         flags = fcntl.fcntl(self.master_fd, fcntl.F_GETFL)
         fcntl.fcntl(self.master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-        
+
         self.running = True
-        
+
         # Start output reading thread
         self.output_thread = threading.Thread(target=self._read_output, daemon=True)
         self.output_thread.start()
-    
+
     def _read_output(self):
         """Read output from the PTY master in a separate thread."""
         while self.running:
@@ -92,7 +97,7 @@ class PTYInterceptor:
                     data = os.read(self.master_fd, 4096)
                     if data:
                         # Decode and process the data
-                        text = data.decode('utf-8', errors='replace')
+                        text = data.decode("utf-8", errors="replace")
                         self._process_output(text)
                     else:
                         # EOF reached
@@ -100,30 +105,30 @@ class PTYInterceptor:
             except (OSError, IOError):
                 # Handle PTY closure or other I/O errors
                 break
-    
+
     def _process_output(self, text: str):
         """Process raw output text and extract complete lines."""
         self.buffer += text
-        
+
         # Split into lines
-        lines = self.buffer.split('\n')
-        
+        lines = self.buffer.split("\n")
+
         # Keep the last incomplete line in buffer
         self.buffer = lines[-1]
-        
+
         # Process complete lines
         for line in lines[:-1]:
-            self.on_output(line + '\n')
-    
+            self.on_output(line + "\n")
+
     def stop(self):
         """Stop the PTY interception."""
         self.running = False
-        
+
         if self.process:
             try:
                 # Send SIGTERM to process group
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-                
+
                 # Wait for process to terminate
                 self.process.wait(timeout=5)
             except (subprocess.TimeoutExpired, ProcessLookupError):
@@ -132,17 +137,17 @@ class PTYInterceptor:
                     os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
                 except ProcessLookupError:
                     pass
-        
+
         if self.master_fd:
             os.close(self.master_fd)
-        
+
         if self.output_thread and self.output_thread.is_alive():
             self.output_thread.join(timeout=1)
 
 
 class SentryTUIApp(App):
     """Main TUI application for intercepting and filtering Sentry devserver logs."""
-    
+
     CSS = """
     Screen {
         layers: base, overlay;
@@ -167,7 +172,7 @@ class SentryTUIApp(App):
         padding: 0 1;
     }
     """
-    
+
     BINDINGS = [
         Binding("q", "quit", "Quit"),
         Binding("ctrl+c", "quit", "Quit"),
@@ -176,7 +181,7 @@ class SentryTUIApp(App):
         Binding("c", "clear_logs", "Clear Logs"),
         Binding("p", "toggle_pause", "Pause/Resume"),
     ]
-    
+
     def __init__(self, command: List[str]):
         super().__init__()
         self.command = command
@@ -185,102 +190,101 @@ class SentryTUIApp(App):
         self.filter_text = reactive("")
         self.paused = reactive(False)
         self.line_count = reactive(0)
-    
+
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
         yield Header()
         yield Vertical(
             Input(placeholder="Filter logs...", id="filter_input"),
             RichLog(id="log_display", auto_scroll=True),
-            id="main_container"
+            id="main_container",
         )
         yield Footer()
-    
+
     def on_mount(self) -> None:
         """Initialize the interceptor when the app mounts."""
         self.interceptor = PTYInterceptor(
-            command=self.command,
-            on_output=self.handle_log_output
+            command=self.command, on_output=self.handle_log_output
         )
         self.interceptor.start()
-        
+
         # Set up filter input handler
         filter_input = self.query_one("#filter_input", Input)
         filter_input.focus()
-    
+
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
         if event.input.id == "filter_input":
             self.filter_text = event.value
             self.update_log_display()
-    
+
     def handle_log_output(self, line: str) -> None:
         """Handle new log output from the intercepted process."""
         if not self.paused:
             log_line = LogLine(line)
             self.log_lines.append(log_line)
             self.line_count = len(self.log_lines)
-            
+
             # Keep only the last 10,000 lines to prevent memory issues
             if len(self.log_lines) > 10000:
                 self.log_lines = self.log_lines[-10000:]
-            
+
             # Update display if line matches filter
             if self.matches_filter(log_line):
                 self.call_from_thread(self.add_log_line, log_line)
-    
+
     def matches_filter(self, log_line: LogLine) -> bool:
         """Check if a log line matches the current filter."""
         if not self.filter_text:
             return True
-        
+
         # Simple case-insensitive substring matching
         return self.filter_text.lower() in log_line.content.lower()
-    
+
     def add_log_line(self, log_line: LogLine) -> None:
         """Add a log line to the display."""
         log_widget = self.query_one("#log_display", RichLog)
         log_widget.write(log_line.content, scroll_end=True)
-    
+
     def update_log_display(self) -> None:
         """Update the log display with filtered content."""
         log_widget = self.query_one("#log_display", RichLog)
         log_widget.clear()
-        
+
         # Show filtered log lines
         for log_line in self.log_lines:
             if self.matches_filter(log_line):
                 log_widget.write(log_line.content, scroll_end=False)
-        
+
         # Scroll to end
         log_widget.scroll_end()
-    
+
     def action_focus_filter(self) -> None:
         """Focus the filter input."""
         self.query_one("#filter_input", Input).focus()
-    
+
     def action_focus_log(self) -> None:
         """Focus the log display."""
         self.query_one("#log_display", RichLog).focus()
-    
+
     def action_clear_logs(self) -> None:
         """Clear all logs."""
         self.log_lines.clear()
         self.line_count = 0
         self.query_one("#log_display", RichLog).clear()
-    
+
     def action_toggle_pause(self) -> None:
         """Toggle pause/resume of log capture."""
         self.paused = not self.paused
         # Update footer to show pause status
         self.refresh()
-    
+
     def action_quit(self) -> None:
         """Quit the application."""
         if self.interceptor:
             self.interceptor.stop()
         self.exit()
-    
+
     def on_unmount(self) -> None:
         """Clean up when the app unmounts."""
         if self.interceptor:
@@ -291,9 +295,11 @@ def main():
     """Main entry point for the PTY interceptor."""
     if len(sys.argv) < 2:
         print("Usage: python -m sentry_tui.pty_interceptor <command> [args...]")
-        print("Example: python -m sentry_tui.pty_interceptor python -m sentry_tui.dummy_app")
+        print(
+            "Example: python -m sentry_tui.pty_interceptor python -m sentry_tui.dummy_app"
+        )
         sys.exit(1)
-    
+
     command = sys.argv[1:]
     app = SentryTUIApp(command)
     app.run()

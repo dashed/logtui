@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added portable timeout handling for cross-platform compatibility
 - Enhanced development workflow with `make dev` target
 - Added note about `uv run` automatically handling dependency syncing
+- Fixed type annotations to satisfy ty type checker requirements
 
 ### Added
 - Initial project structure with `uv` package management
@@ -34,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Makefile with common development commands
   - Project entry points for easy CLI access
   - Proper `src/` layout for clean packaging
+  - Ruff integration for linting and formatting
+  - ty integration for fast type checking
+  - Comprehensive code quality checks with `make check`
 
 ### Technical Details
 - Implements PTY-based interception as outlined in feasibility document
@@ -46,6 +50,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `make run-dummy` - Run the dummy app for testing
 - `make pty-test` - Test PTY interception with dummy app
 - `uv run python -m sentry_tui.pty_interceptor <command>` - Intercept any command
+
+### Development Commands
+- `make dev` - Setup development environment
+- `make test` - Run tests
+- `make lint` - Lint code with ruff
+- `make format` - Format code with ruff
+- `make typecheck` - Type check with ty
+- `make check` - Run all checks (lint + format + type check)
+- `make clean` - Clean up generated files
 
 ### Keyboard Shortcuts
 - `q` or `Ctrl+C` - Quit application

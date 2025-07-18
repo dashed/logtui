@@ -1,6 +1,6 @@
 # Makefile for sentry-tui development
 
-.PHONY: sync run-dummy test-dummy pty-test clean help dev test
+.PHONY: sync run-dummy test-dummy pty-test clean help dev test lint format check typecheck
 
 # Sync dependencies (explicit sync for CI or when needed)
 sync:
@@ -32,6 +32,24 @@ dev: sync
 test:
 	uv run pytest
 
+# Lint code with ruff
+lint:
+	uv run ruff check .
+
+# Format code with ruff
+format:
+	uv run ruff format .
+
+# Type check with ty
+typecheck:
+	uv run ty check .
+
+# Check code (lint + format check + type check)
+check:
+	uv run ruff check .
+	uv run ruff format --check .
+	uv run ty check .
+
 # Clean up generated files
 clean:
 	rm -rf .venv
@@ -51,6 +69,10 @@ help:
 	@echo "  pty-test   - Test PTY-based interception"
 	@echo "  dev        - Setup development environment"
 	@echo "  test       - Run tests"
+	@echo "  lint       - Lint code with ruff"
+	@echo "  format     - Format code with ruff"
+	@echo "  typecheck  - Type check with ty"
+	@echo "  check      - Check code (lint + format + type check)"
 	@echo "  clean      - Clean up generated files"
 	@echo "  help       - Show this help message"
 	@echo ""
