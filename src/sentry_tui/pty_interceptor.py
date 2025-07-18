@@ -40,6 +40,55 @@ def strip_ansi_codes(text: str) -> str:
     return ANSI_ESCAPE_REGEX.sub("", text)
 
 
+def strip_ansi_background_colors(text: str) -> str:
+    """Remove ANSI background color codes while preserving foreground colors and other formatting."""
+    # Pattern to match and remove background color codes while preserving other codes
+    # This handles combined codes like ESC[31;42m (red foreground, green background)
+    
+    def replace_bg_codes(match):
+        full_code = match.group(0)
+        # Extract the parameters between ESC[ and m
+        params = full_code[2:-1]  # Remove ESC[ and m
+        
+        # Split by semicolon and filter out background codes
+        parts = params.split(';')
+        filtered_parts = []
+        
+        i = 0
+        while i < len(parts):
+            param = parts[i]
+            
+            # Check if this is a background color code
+            if param.isdigit():
+                num = int(param)
+                # Standard background colors (40-47) or high intensity (100-107)
+                if (40 <= num <= 47) or (100 <= num <= 107):
+                    i += 1
+                    continue
+                # 256-color background (48;5;n)
+                elif num == 48 and i + 2 < len(parts) and parts[i + 1] == '5':
+                    i += 3  # Skip 48, 5, and the color number
+                    continue
+                # RGB background (48;2;r;g;b)
+                elif num == 48 and i + 4 < len(parts) and parts[i + 1] == '2':
+                    i += 5  # Skip 48, 2, r, g, b
+                    continue
+            
+            filtered_parts.append(param)
+            i += 1
+        
+        # If no codes remain, return empty string
+        if not filtered_parts:
+            return ""
+        
+        # Reconstruct the escape sequence
+        return f"\x1b[{';'.join(filtered_parts)}m"
+    
+    # Pattern to match any ANSI escape sequence
+    pattern = re.compile(r'\x1b\[[0-9;]*m')
+    return pattern.sub(replace_bg_codes, text)
+
+
 # Sentry service colors from src/sentry/runner/formatting.py:18-24
 SENTRY_SERVICE_COLORS = {
     "server": (108, 95, 199),
@@ -346,7 +395,9 @@ class SentryTUIApp(App):
     def add_log_line(self, log_line: LogLine) -> None:
         """Add a log line to the display."""
         log_widget = self.query_one("#log_display", RichLog)
-        log_widget.write(log_line.content, scroll_end=True)
+        # Strip background colors to prevent bleeding while preserving foreground colors
+        clean_content = strip_ansi_background_colors(log_line.content)
+        log_widget.write(clean_content, scroll_end=True)
 
     def update_log_display(self) -> None:
         """Update the log display with filtered content."""
@@ -356,7 +407,9 @@ class SentryTUIApp(App):
         # Show filtered log lines
         for log_line in self.log_lines:
             if self.matches_filter(log_line):
-                log_widget.write(log_line.content, scroll_end=False)
+                # Strip background colors to prevent bleeding while preserving foreground colors
+                clean_content = strip_ansi_background_colors(log_line.content)
+                log_widget.write(clean_content, scroll_end=False)
 
         # Scroll to end
         log_widget.scroll_end()

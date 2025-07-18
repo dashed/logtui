@@ -2,7 +2,7 @@
 
 import subprocess
 from unittest.mock import Mock, patch, call
-from sentry_tui.pty_interceptor import PTYInterceptor
+from sentry_tui.pty_interceptor import PTYInterceptor, strip_ansi_background_colors
 
 
 class TestPTYInterceptor:
@@ -475,3 +475,103 @@ class TestPTYInterceptor:
         expected_calls = [call("\n"), call("\n"), call("\n")]
         output_handler.assert_has_calls(expected_calls)
         assert interceptor.buffer == ""
+
+
+class TestAnsiBackgroundColorStripping:
+    """Test cases for ANSI background color stripping function."""
+
+    def test_strip_standard_background_colors(self):
+        """Test stripping standard background colors (40-47)."""
+        # Test all standard background colors
+        for i in range(40, 48):
+            text = f"Hello \x1b[{i}mWorld\x1b[0m"
+            result = strip_ansi_background_colors(text)
+            assert result == "Hello World\x1b[0m"
+
+    def test_strip_high_intensity_background_colors(self):
+        """Test stripping high intensity background colors (100-107)."""
+        # Test all high intensity background colors
+        for i in range(100, 108):
+            text = f"Hello \x1b[{i}mWorld\x1b[0m"
+            result = strip_ansi_background_colors(text)
+            assert result == "Hello World\x1b[0m"
+
+    def test_strip_256_color_background(self):
+        """Test stripping 256-color background codes."""
+        text = "Hello \x1b[48;5;196mWorld\x1b[0m"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello World\x1b[0m"
+
+    def test_strip_rgb_background(self):
+        """Test stripping RGB background codes."""
+        text = "Hello \x1b[48;2;255;0;0mWorld\x1b[0m"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello World\x1b[0m"
+
+    def test_preserve_foreground_colors(self):
+        """Test that foreground colors are preserved."""
+        # Standard foreground colors (30-37)
+        text = "Hello \x1b[31mRed\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[31mRed\x1b[0m World"
+
+        # High intensity foreground colors (90-97)
+        text = "Hello \x1b[91mBright Red\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[91mBright Red\x1b[0m World"
+
+        # 256-color foreground
+        text = "Hello \x1b[38;5;196mRed\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[38;5;196mRed\x1b[0m World"
+
+        # RGB foreground
+        text = "Hello \x1b[38;2;255;0;0mRed\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[38;2;255;0;0mRed\x1b[0m World"
+
+    def test_preserve_other_formatting(self):
+        """Test that other formatting codes are preserved."""
+        # Bold
+        text = "Hello \x1b[1mBold\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[1mBold\x1b[0m World"
+
+        # Italic
+        text = "Hello \x1b[3mItalic\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[3mItalic\x1b[0m World"
+
+        # Underline
+        text = "Hello \x1b[4mUnderline\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[4mUnderline\x1b[0m World"
+
+    def test_mixed_background_and_foreground(self):
+        """Test stripping background while preserving foreground in mixed scenarios."""
+        text = "Hello \x1b[31;42mRed on Green\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello \x1b[31mRed on Green\x1b[0m World"
+
+    def test_multiple_background_codes(self):
+        """Test stripping multiple background codes."""
+        text = "Hello \x1b[41mRed BG\x1b[0m and \x1b[43mYellow BG\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == "Hello Red BG\x1b[0m and Yellow BG\x1b[0m World"
+
+    def test_no_background_colors(self):
+        """Test that text without background colors is unchanged."""
+        text = "Hello \x1b[31mRed\x1b[0m World"
+        result = strip_ansi_background_colors(text)
+        assert result == text
+
+    def test_empty_string(self):
+        """Test that empty string is handled correctly."""
+        result = strip_ansi_background_colors("")
+        assert result == ""
+
+    def test_plain_text(self):
+        """Test that plain text without ANSI codes is unchanged."""
+        text = "Hello World"
+        result = strip_ansi_background_colors(text)
+        assert result == text
