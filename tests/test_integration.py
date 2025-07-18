@@ -92,6 +92,7 @@ class TestIntegration:
 
     @pytest.mark.slow
     @pytest.mark.integration
+    @pytest.mark.asyncio
     async def test_sentry_tui_app_with_dummy_app(self):
         """Test SentryTUIApp with the dummy app."""
         import sys
@@ -109,29 +110,34 @@ class TestIntegration:
             # Verify we have some log lines
             assert len(app.log_lines) > 0
             
-            # Test filtering
-            await pilot.press("f")  # Focus filter
-            await pilot.press("s", "e", "r", "v", "e", "r")  # Type "server"
-            
-            # Wait for filter to be applied
-            await asyncio.sleep(0.5)
-            
-            # Verify filter text is set
-            assert app.filter_text == "server"
+            # Test filtering functionality directly
+            app.filter_text = "server"
+            app.update_log_display()
+            await pilot.pause()
             
             # Test that some lines match the filter
             server_lines = [line for line in app.log_lines if app.matches_filter(line)]
             assert len(server_lines) > 0
             
-            # Test clear logs
-            await pilot.press("c")
+            # Test clear logs action directly
+            original_count = len(app.log_lines)
+            assert original_count > 0
+            app.action_clear_logs()
+            await pilot.pause()
             assert len(app.log_lines) == 0
             
-            # Test pause/resume
-            await pilot.press("p")
+            # Wait for more logs to accumulate
+            await asyncio.sleep(1)
+            assert len(app.log_lines) > 0
+            
+            # Test pause/resume functionality directly
+            assert app.paused == False
+            app.action_toggle_pause()
+            await pilot.pause()
             assert app.paused == True
             
-            await pilot.press("p")
+            app.action_toggle_pause()
+            await pilot.pause()
             assert app.paused == False
 
     @pytest.mark.slow

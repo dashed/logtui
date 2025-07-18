@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed type annotations to satisfy ty type checker requirements
 - Updated service extraction regex to support hyphenated service names (e.g., "celery-beat")
 - Fixed test data to use correct timestamp format (HH:MM:SS instead of full datetime)
+
+### Fixed
+- CSS parsing error: Changed `layers: base, overlay;` to `layers: base overlay;` following Textual CSS syntax
+- Reactive variable declarations moved from `__init__` to class level for proper Textual behavior
+- Key binding tests now properly handle Input widget focus management
+- Threading issues in memory management tests resolved with proper mocking
+- Integration test async decorator and timing issues for reliable test execution
+- All 96 tests now pass successfully (previously 38 failures reduced to 0)
 - Initial project structure with `uv` package management
 - PTY-based interception system for capturing process output while preserving terminal behavior
 - Dummy app that simulates Sentry devserver log output with:

@@ -158,7 +158,7 @@ class SentryTUIApp(App):
 
     CSS = """
     Screen {
-        layers: base, overlay;
+        layers: base overlay;
     }
     
     #log_display {
@@ -190,14 +190,15 @@ class SentryTUIApp(App):
         Binding("p", "toggle_pause", "Pause/Resume"),
     ]
 
+    filter_text = reactive("")
+    paused = reactive(False)
+    line_count = reactive(0)
+
     def __init__(self, command: List[str]):
         super().__init__()
         self.command = command
         self.interceptor = None
         self.log_lines: List[LogLine] = []
-        self.filter_text = reactive("")
-        self.paused = reactive(False)
-        self.line_count = reactive(0)
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
