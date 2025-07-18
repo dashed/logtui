@@ -43,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Threading issues in memory management tests resolved with proper mocking
 - Integration test async decorator and timing issues for reliable test execution
 - All 88 tests now pass successfully (previously had failing tests due to format mismatches)
+- PTY interceptor "Bad file descriptor" error on application quit by adding proper error handling in stop() method
 - Initial project structure with `uv` package management
 - PTY-based interception system for capturing process output while preserving terminal behavior
 - Dummy app that simulates Sentry devserver log output with:

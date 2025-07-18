@@ -233,8 +233,14 @@ class PTYInterceptor:
                 except ProcessLookupError:
                     pass
 
-        if self.master_fd:
-            os.close(self.master_fd)
+        if self.master_fd is not None:
+            try:
+                os.close(self.master_fd)
+            except OSError:
+                # File descriptor was already closed
+                pass
+            finally:
+                self.master_fd = None
 
         if self.output_thread and self.output_thread.is_alive():
             self.output_thread.join(timeout=1)

@@ -171,6 +171,9 @@ class TestPTYInterceptor:
         # Verify file descriptor cleanup
         mock_close.assert_called_once_with(10)
 
+        # Verify master_fd is set to None after cleanup
+        assert interceptor.master_fd is None
+
         # Verify thread cleanup
         interceptor.output_thread.join.assert_called_once_with(timeout=1)
 
@@ -361,6 +364,82 @@ class TestPTYInterceptor:
 
         # Verify output handler was not called
         output_handler.assert_not_called()
+
+    @patch("os.killpg")
+    @patch("os.getpgid")
+    @patch("os.close")
+    def test_stop_interceptor_fd_already_closed(self, mock_close, mock_getpgid, mock_killpg):
+        """Test stopping the PTY interceptor when file descriptor is already closed."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+
+        # Setup interceptor state
+        interceptor.running = True
+        interceptor.process = Mock()
+        interceptor.process.pid = 12345
+        interceptor.master_fd = 10
+        interceptor.output_thread = Mock()
+        interceptor.output_thread.is_alive.return_value = True
+
+        mock_getpgid.return_value = 54321
+        # Mock close to raise OSError (bad file descriptor)
+        mock_close.side_effect = OSError("Bad file descriptor")
+
+        interceptor.stop()
+
+        # Verify state
+        assert interceptor.running is False
+
+        # Verify process termination
+        mock_getpgid.assert_called_with(12345)
+        mock_killpg.assert_called_with(54321, 15)  # SIGTERM
+        interceptor.process.wait.assert_called_once_with(timeout=5)
+
+        # Verify file descriptor cleanup was attempted
+        mock_close.assert_called_once_with(10)
+
+        # Verify master_fd is set to None even when close fails
+        assert interceptor.master_fd is None
+
+        # Verify thread cleanup
+        interceptor.output_thread.join.assert_called_once_with(timeout=1)
+
+    @patch("os.killpg")
+    @patch("os.getpgid")
+    @patch("os.close")
+    def test_stop_interceptor_no_fd(self, mock_close, mock_getpgid, mock_killpg):
+        """Test stopping the PTY interceptor when no file descriptor is set."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+
+        # Setup interceptor state
+        interceptor.running = True
+        interceptor.process = Mock()
+        interceptor.process.pid = 12345
+        interceptor.master_fd = None  # No file descriptor
+        interceptor.output_thread = Mock()
+        interceptor.output_thread.is_alive.return_value = True
+
+        mock_getpgid.return_value = 54321
+
+        interceptor.stop()
+
+        # Verify state
+        assert interceptor.running is False
+
+        # Verify process termination
+        mock_getpgid.assert_called_with(12345)
+        mock_killpg.assert_called_with(54321, 15)  # SIGTERM
+        interceptor.process.wait.assert_called_once_with(timeout=5)
+
+        # Verify file descriptor cleanup was not attempted
+        mock_close.assert_not_called()
+
+        # Verify master_fd remains None
+        assert interceptor.master_fd is None
+
+        # Verify thread cleanup
+        interceptor.output_thread.join.assert_called_once_with(timeout=1)
 
     def test_process_output_unicode_handling(self):
         """Test processing output with Unicode characters."""
