@@ -19,6 +19,7 @@ from textual.widgets import RichLog, Input, Footer, Header
 from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.binding import Binding
+from rich.text import Text
 
 
 # Regex used for ansi escape code splitting
@@ -38,6 +39,46 @@ ANSI_ESCAPE_REGEX = re.compile(
 def strip_ansi_codes(text: str) -> str:
     """Remove all VT control characters. Use to estimate displayed string width."""
     return ANSI_ESCAPE_REGEX.sub("", text)
+
+
+def apply_rich_coloring(text: str) -> Text:
+    """Apply Rich-based coloring to log text while stripping ANSI codes."""
+    # Strip all ANSI codes first
+    clean_text = strip_ansi_codes(text)
+    
+    # Create a Rich Text object
+    rich_text = Text(clean_text)
+    
+    # Apply coloring based on content patterns
+    if "server" in clean_text:
+        # Purple color for server logs (matching Sentry's color scheme)
+        rich_text.highlight_regex(r'\bserver\b', style="rgb(108,95,199)")
+    elif "worker" in clean_text or "taskworker" in clean_text:
+        # Yellow color for worker logs
+        rich_text.highlight_regex(r'\b(worker|taskworker)\b', style="rgb(255,194,39)")
+    elif "webpack" in clean_text:
+        # Blue color for webpack logs
+        rich_text.highlight_regex(r'\bwebpack\b', style="rgb(61,116,219)")
+    elif "cron" in clean_text or "celery-beat" in clean_text:
+        # Pink color for cron/beat logs
+        rich_text.highlight_regex(r'\b(cron|celery-beat)\b', style="rgb(255,86,124)")
+    elif "relay" in clean_text:
+        # Red color for relay logs
+        rich_text.highlight_regex(r'\brelay\b', style="rgb(250,71,71)")
+    elif "getsentry-outcomes" in clean_text:
+        # Orange color for outcomes logs
+        rich_text.highlight_regex(r'\bgetsentry-outcomes\b', style="rgb(255,119,56)")
+    
+    # Apply log level coloring
+    rich_text.highlight_regex(r'\[ERROR\]', style="bold red")
+    rich_text.highlight_regex(r'\[WARNING\]', style="bold yellow")
+    rich_text.highlight_regex(r'\[INFO\]', style="bold blue")
+    rich_text.highlight_regex(r'\[DEBUG\]', style="bold dim")
+    
+    # Highlight timestamps
+    rich_text.highlight_regex(r'\d{2}:\d{2}:\d{2}', style="dim")
+    
+    return rich_text
 
 
 def strip_ansi_background_colors(text: str) -> str:
@@ -307,6 +348,12 @@ class SentryTUIApp(App):
         height: 1fr;
         border: solid $primary;
         scrollbar-gutter: stable;
+        background: transparent;
+    }
+    
+    #log_display:focus {
+        background: transparent;
+        background-tint: transparent;
     }
     
     #filter_input {
@@ -395,9 +442,9 @@ class SentryTUIApp(App):
     def add_log_line(self, log_line: LogLine) -> None:
         """Add a log line to the display."""
         log_widget = self.query_one("#log_display", RichLog)
-        # Strip background colors to prevent bleeding while preserving foreground colors
-        clean_content = strip_ansi_background_colors(log_line.content)
-        log_widget.write(clean_content, scroll_end=True)
+        # Apply Rich-based coloring instead of ANSI codes
+        rich_content = apply_rich_coloring(log_line.content.rstrip('\n'))
+        log_widget.write(rich_content, scroll_end=True)
 
     def update_log_display(self) -> None:
         """Update the log display with filtered content."""
@@ -407,9 +454,9 @@ class SentryTUIApp(App):
         # Show filtered log lines
         for log_line in self.log_lines:
             if self.matches_filter(log_line):
-                # Strip background colors to prevent bleeding while preserving foreground colors
-                clean_content = strip_ansi_background_colors(log_line.content)
-                log_widget.write(clean_content, scroll_end=False)
+                # Apply Rich-based coloring instead of ANSI codes
+                rich_content = apply_rich_coloring(log_line.content.rstrip('\n'))
+                log_widget.write(rich_content, scroll_end=False)
 
         # Scroll to end
         log_widget.scroll_end()

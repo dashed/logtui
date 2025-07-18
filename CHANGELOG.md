@@ -10,12 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Comprehensive ANSI escape code regex ported from Node.js chalk library for robust terminal output parsing
 - ANSI background color stripping function to prevent color bleeding while preserving foreground colors and formatting
+- Rich-based coloring system to replace ANSI codes with clean, reliable styling
 - Comprehensive test suite using pytest and textual testing framework
 - Test configuration with `pytest.ini` for asyncio support
 - Shared test fixtures in `conftest.py` for mocking system components
 - Unit tests for LogLine class with service extraction and timestamp handling
 - Unit tests for PTYInterceptor class with mocking of system calls
 - Unit tests for ANSI background color stripping with comprehensive coverage of all color code types
+- Unit tests for Rich-based coloring functionality with service name and log level styling
 - TUI interaction tests for SentryTUIApp with async support
 - Log filtering tests with parametrized test cases
 - Integration tests with real dummy app execution
@@ -47,6 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All 88 tests now pass successfully (previously had failing tests due to format mismatches)
 - PTY interceptor "Bad file descriptor" error on application quit by adding proper error handling in stop() method
 - ANSI background color bleeding in TUI display by stripping background colors while preserving foreground colors
+- Log line spacing issues and display artifacts by implementing Rich-based coloring system to replace ANSI codes
 - Initial project structure with `uv` package management
 - PTY-based interception system for capturing process output while preserving terminal behavior
 - Dummy app that simulates Sentry devserver log output with:
