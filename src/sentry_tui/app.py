@@ -76,18 +76,18 @@ class SentryTUIApp(App):
     """
 
     BINDINGS = [
-        Binding("q", "quit", "Quit"),
-        Binding("ctrl+c", "quit", "Quit"),
-        Binding("f", "focus_filter", "Focus Filter"),
-        Binding("l", "focus_log", "Focus Log"),
-        Binding("c", "clear_logs", "Clear Logs"),
-        Binding("p", "toggle_pause", "Pause/Resume"),
-        Binding("s", "graceful_shutdown", "Graceful Shutdown"),
-        Binding("k", "force_quit", "Force Quit"),
-        Binding("r", "restart", "Restart"),
-        Binding("shift+r", "force_restart", "Force Restart"),
-        Binding("a", "toggle_auto_restart", "Toggle Auto-restart"),
-        Binding("e", "edit_command", "Edit Command"),
+        Binding("q", "quit", "Quit", priority=True),
+        Binding("ctrl+c", "quit", "Quit", priority=True),
+        Binding("f", "focus_filter", "Focus Filter", priority=True),
+        Binding("l", "focus_log", "Focus Log", priority=True),
+        Binding("c", "clear_logs", "Clear Logs", priority=True),
+        Binding("p", "toggle_pause", "Pause/Resume", priority=True),
+        Binding("s", "graceful_shutdown", "Graceful Shutdown", priority=True),
+        Binding("k", "force_quit", "Force Quit", priority=True),
+        Binding("r", "restart", "Restart", priority=True),
+        Binding("shift+r", "force_restart", "Force Restart", priority=True),
+        Binding("a", "toggle_auto_restart", "Toggle Auto-restart", priority=True),
+        Binding("e", "edit_command", "Edit Command", priority=True),
     ]
 
     filter_text = reactive("")
