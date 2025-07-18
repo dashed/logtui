@@ -4,7 +4,7 @@ This document tracks the current implementation status against the original feas
 
 ## Overview
 
-**Current Implementation Status**: ~65% Complete  
+**Current Implementation Status**: ~75% Complete  
 **Core Functionality**: ✅ Implemented  
 **Advanced Features**: 🚫 Missing  
 **Polish & UX**: 🚫 Missing  
@@ -33,8 +33,10 @@ This document tracks the current implementation status against the original feas
 
 ### Filtering & Search
 - [x] **Real-time filtering** with case-insensitive search
+- [x] **Service Toggle Bar** with horizontal checkboxes to show/hide specific services
 - [x] **Simple substring matching** 
 - [x] **Filter-as-you-type** functionality
+- [x] **Combined filtering** (text + service toggles)
 
 ### Performance & Memory
 - [x] **Memory management** with 10,000 line circular buffer
@@ -51,14 +53,14 @@ This document tracks the current implementation status against the original feas
 
 ### High Priority (Essential for Production Use)
 
-#### 1. Service Toggle Sidebar
+#### 1. ✅ Service Toggle Bar (COMPLETED)
 **From Spec**: Visual toggles to show/hide specific services
 ```
 │ [✓] server  [✓] worker  [✓] celery-beat  [ ] webpack                    │
 ```
-**Current Status**: Only text-based filtering  
-**Impact**: Users cannot easily isolate logs from specific services  
-**Effort**: Medium (1-2 weeks)
+**Current Status**: ✅ Implemented with horizontal checkbox layout  
+**Features**: Real-time service filtering, compact design, all services enabled by default  
+**Completed**: December 2024
 
 #### 2. DevServer Flag Integration
 **From Spec**: Pass-through and detection of devserver flags
@@ -72,7 +74,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Cannot use with different devserver configurations  
 **Effort**: Medium (1-2 weeks)
 
-#### 3. Log Level Filtering
+#### 2. Log Level Filtering
 **From Spec**: Show/hide logs by severity level
 - [ ] **Independent filtering** by DEBUG/INFO/WARNING/ERROR
 - [ ] **Log level toggle buttons** in UI
@@ -84,7 +86,7 @@ This document tracks the current implementation status against the original feas
 
 ### Medium Priority (Enhanced Functionality)
 
-#### 4. Advanced Filter Modes
+#### 3. Advanced Filter Modes
 **From Spec**: Multiple filter types and modes
 - [ ] **Regex filter support** for complex pattern matching
 - [ ] **Exact match mode** toggle
@@ -95,7 +97,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Power users cannot use complex search patterns  
 **Effort**: Medium (1-2 weeks)
 
-#### 5. Export Functionality
+#### 4. Export Functionality
 **From Spec**: Save filtered results to file
 - [ ] **Export current view** to text file
 - [ ] **Export with timestamps** and service names
@@ -106,20 +108,20 @@ This document tracks the current implementation status against the original feas
 **Impact**: Cannot share or analyze log data externally  
 **Effort**: Small (1 week)
 
-#### 6. GetSentry Support
+#### 5. GetSentry Support
 **From Spec**: Support for GetSentry-specific services and configuration
 - [ ] **Recognition of `getsentry-outcomes` service**
 - [ ] **Extended service colors** for GetSentry processes
 - [ ] **Configuration detection** (GetSentry vs core Sentry)
 - [ ] **Additional service support** for GetSentry ecosystem
 
-**Current Status**: Only core Sentry services supported  
-**Impact**: GetSentry developers cannot use effectively  
-**Effort**: Small (1 week)
+**Current Status**: ✅ GetSentry services partially supported (getsentry-outcomes, celery-beat, taskworker)  
+**Impact**: Most GetSentry developers can use effectively  
+**Effort**: Small (1 week for remaining services)
 
 ### Low Priority (Polish & UX)
 
-#### 7. Enhanced Status Bar
+#### 6. Enhanced Status Bar
 **From Spec**: Rich status information display
 ```
 │ Filter: █                                                  Lines: 1,234   │
@@ -133,7 +135,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Users lack visibility into current state  
 **Effort**: Small (1 week)
 
-#### 8. Search History
+#### 7. Search History
 **From Spec**: Remember and navigate previous searches
 - [ ] **Search history storage** with persistence
 - [ ] **History navigation** with up/down arrows
@@ -144,7 +146,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Users must retype common filters  
 **Effort**: Medium (1-2 weeks)
 
-#### 9. Help System
+#### 8. Help System
 **From Spec**: Comprehensive help and documentation
 - [ ] **Help overlay** with keyboard shortcuts
 - [ ] **Interactive tutorial** for new users
@@ -155,7 +157,7 @@ This document tracks the current implementation status against the original feas
 **Impact**: Users must learn shortcuts by trial and error  
 **Effort**: Small (1 week)
 
-#### 10. Configuration Support
+#### 9. Configuration Support
 **From Spec**: Persistent settings and customization
 - [ ] **Configuration file support** (YAML/JSON)
 - [ ] **Custom service colors** configuration
@@ -169,7 +171,7 @@ This document tracks the current implementation status against the original feas
 
 ## 🎯 Recommended Implementation Roadmap
 
-### Phase 1: Production Readiness (4-6 weeks)
+### Phase 1: Production Readiness (2-4 weeks)
 **Goal**: Make the tool usable for daily development work
 
 1. **DevServer Flag Integration** (2 weeks)
@@ -177,12 +179,12 @@ This document tracks the current implementation status against the original feas
    - Add flag detection and parsing adjustment
    - Test with various devserver configurations
 
-2. **Service Toggle Sidebar** (2 weeks)
-   - Add service toggle UI components
-   - Implement service-based filtering logic
-   - Integrate with existing filter system
+2. ✅ **Service Toggle Bar** (COMPLETED)
+   - ✅ Add service toggle UI components
+   - ✅ Implement service-based filtering logic
+   - ✅ Integrate with existing filter system
 
-3. **Log Level Filtering** (1-2 weeks)
+2. **Log Level Filtering** (1-2 weeks)
    - Add log level parsing and filtering
    - Create level toggle UI elements
    - Implement minimum level filtering
@@ -190,17 +192,17 @@ This document tracks the current implementation status against the original feas
 ### Phase 2: Enhanced Features (3-4 weeks)
 **Goal**: Add power user features and GetSentry support
 
-4. **Advanced Filter Modes** (2 weeks)
+3. **Advanced Filter Modes** (2 weeks)
    - Implement regex filter support
    - Add filter mode switching UI
    - Create exact match mode
 
-5. **Export Functionality** (1 week)
+4. **Export Functionality** (1 week)
    - Add export commands and UI
    - Implement multiple export formats
    - Test with large log volumes
 
-6. **GetSentry Support** (1 week)
+5. **GetSentry Support** (1 week)
    - Add GetSentry service recognition
    - Extend service color mapping
    - Test with GetSentry devserver
@@ -208,16 +210,16 @@ This document tracks the current implementation status against the original feas
 ### Phase 3: Polish & UX (2-3 weeks)
 **Goal**: Improve user experience and discoverability
 
-7. **Enhanced Status Bar** (1 week)
+6. **Enhanced Status Bar** (1 week)
    - Add line count and filter indicators
    - Implement performance metrics display
 
-8. **Search History** (1-2 weeks)
+7. **Search History** (1-2 weeks)
    - Implement search persistence
    - Add history navigation
    - Create search suggestions
 
-9. **Help System** (1 week)
+8. **Help System** (1 week)
    - Create help overlay
    - Add keyboard shortcut documentation
    - Implement context-sensitive help
@@ -225,7 +227,7 @@ This document tracks the current implementation status against the original feas
 ### Phase 4: Advanced Configuration (1-2 weeks)
 **Goal**: Enable customization and advanced use cases
 
-10. **Configuration Support** (1-2 weeks)
+9. **Configuration Support** (1-2 weeks)
     - Implement configuration file system
     - Add customization options
     - Create migration system for settings
@@ -262,13 +264,14 @@ This document tracks the current implementation status against the original feas
 
 ## Conclusion
 
-The current implementation provides a **solid foundation** with core functionality working well. The **next phase** should focus on **production readiness** features (DevServer integration, service toggles, log level filtering) before moving to **advanced features** and **polish**.
+The current implementation provides a **solid foundation** with core functionality working well. With the **Service Toggle Bar** now complete, the **next phase** should focus on remaining **production readiness** features (DevServer integration, log level filtering) before moving to **advanced features** and **polish**.
 
 **Key Success Metrics**:
 - ✅ **Core functionality** is stable and tested
-- 🚫 **Production readiness** features are missing
+- ✅ **Service Toggle Bar** is implemented and working
+- 🚫 **Production readiness** features are partially complete
 - 🚫 **Advanced features** need implementation
 - 🚫 **User experience** polish is needed
 
-**Estimated time to production-ready**: 4-6 weeks  
-**Estimated time to feature-complete**: 10-15 weeks
+**Estimated time to production-ready**: 2-4 weeks  
+**Estimated time to feature-complete**: 8-12 weeks
