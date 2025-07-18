@@ -29,6 +29,15 @@ class ServiceToggleBar(Horizontal):
 
     def compose(self) -> ComposeResult:
         """Compose the service toggle checkboxes."""
+        # Add toggle all button if we have services
+        if self.services:
+            yield Button(
+                "Toggle All",
+                id="toggle_all_button",
+                variant="default",
+                compact=True,
+            )
+
         for service in self.services:
             yield Checkbox(
                 f"[b]{service}[/b]",
@@ -45,6 +54,16 @@ class ServiceToggleBar(Horizontal):
 
             # Add the checkbox widget only if the widget is mounted
             if self.is_mounted:
+                # Add toggle all button if this is the first service
+                if len(self.services) == 1:
+                    toggle_all_button = Button(
+                        "Toggle All",
+                        id="toggle_all_button",
+                        variant="default",
+                        compact=True,
+                    )
+                    self.mount(toggle_all_button)
+
                 checkbox = Checkbox(
                     f"[b]{service}[/b]",
                     value=True,
@@ -64,6 +83,37 @@ class ServiceToggleBar(Horizontal):
 
             # Notify parent app about the change
             self.post_message(self.ServiceToggled(service_name, event.checkbox.value))
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handle button presses."""
+        if event.button.id == "toggle_all_button":
+            self.smart_toggle_all()
+
+    def smart_toggle_all(self) -> None:
+        """Smart toggle all services - if all are enabled, disable all; otherwise enable all."""
+        if not self.services:
+            return
+
+        # Check if all services are currently enabled
+        all_enabled = len(self.enabled_services) == len(self.services)
+
+        # Smart toggle: if all are enabled, disable all; otherwise enable all
+        target_state = not all_enabled
+
+        # Update all checkboxes and internal state
+        for service in self.services:
+            # Only update checkbox if widget is mounted
+            if self.is_mounted:
+                checkbox = self.query_one(f"#service_{service}", Checkbox)
+                checkbox.value = target_state
+
+            if target_state:
+                self.enabled_services.add(service)
+            else:
+                self.enabled_services.discard(service)
+
+            # Notify parent app about each change
+            self.post_message(self.ServiceToggled(service, target_state))
 
     def is_service_enabled(self, service: str) -> bool:
         """Check if a service is currently enabled."""

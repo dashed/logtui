@@ -610,6 +610,43 @@ class TestServiceToggleBar:
                 # Verify call_from_thread was called
                 mock_call_from_thread.assert_called()
 
+    @pytest.mark.asyncio
+    async def test_smart_toggle_all_functionality(self):
+        """Test that smart toggle all works correctly."""
+        service_toggle_bar = ServiceToggleBar()
+        
+        # Add some services
+        service_toggle_bar.add_service("server")
+        service_toggle_bar.add_service("worker")
+        service_toggle_bar.add_service("webpack")
+        
+        # Initially all services should be enabled
+        assert len(service_toggle_bar.enabled_services) == 3
+        assert "server" in service_toggle_bar.enabled_services
+        assert "worker" in service_toggle_bar.enabled_services
+        assert "webpack" in service_toggle_bar.enabled_services
+        
+        # Test smart toggle: all enabled -> all disabled
+        service_toggle_bar.smart_toggle_all()
+        assert len(service_toggle_bar.enabled_services) == 0
+        
+        # Test smart toggle: all disabled -> all enabled
+        service_toggle_bar.smart_toggle_all()
+        assert len(service_toggle_bar.enabled_services) == 3
+        assert "server" in service_toggle_bar.enabled_services
+        assert "worker" in service_toggle_bar.enabled_services
+        assert "webpack" in service_toggle_bar.enabled_services
+        
+        # Test smart toggle: mixed state -> all enabled
+        service_toggle_bar.enabled_services.discard("worker")  # disable one
+        assert len(service_toggle_bar.enabled_services) == 2
+        
+        service_toggle_bar.smart_toggle_all()
+        assert len(service_toggle_bar.enabled_services) == 3
+        assert "server" in service_toggle_bar.enabled_services
+        assert "worker" in service_toggle_bar.enabled_services
+        assert "webpack" in service_toggle_bar.enabled_services
+
 
 class TestProcessControlActions:
     """Test cases for process control actions in SentryTUIApp."""

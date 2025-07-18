@@ -83,6 +83,15 @@ class SentryTUIApp(App):
         width: auto;
     }
     
+    #service_toggle_bar Button {
+        margin: 0 1;
+        padding: 0;
+        width: auto;
+        height: 1;
+        min-width: 10;
+        max-width: 10;
+    }
+    
     #process_status_bar {
         height: 1;
         background: $surface;

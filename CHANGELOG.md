@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Argument Separation**: Support for `--` separator to prevent conflicts between sentry-tui and target command flags
 - **Service Toggle Bar**: Horizontal bar with checkboxes to show/hide specific services in real-time
 - **Dynamic service discovery**: Automatically detects and adds toggles for any new services found in logs
+- **Smart Toggle All**: Compact button to enable/disable all services at once with smart behavior
+  - If all services are enabled, disables all services
+  - If any services are disabled, enables all services
+  - Maintains consistency with existing toggle behavior
 - **Process Management**: Complete process lifecycle control without restarting sentry-tui
   - **Graceful shutdown**: Send SIGTERM to devserver process (key: `s`)
   - **Force quit**: Send SIGKILL to devserver process (key: `k`)
