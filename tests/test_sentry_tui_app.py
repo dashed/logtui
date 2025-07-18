@@ -57,7 +57,7 @@ class TestSentryTUIApp:
         async with app.run_test():
             # Verify interceptor was created and started
             assert app.interceptor is not None
-            app.interceptor.start.assert_called_once()
+            app.interceptor.start.assert_called_once()  # type: ignore
 
     @pytest.mark.asyncio
     async def test_filter_input_changes_filter_text(self, mock_interceptor):
@@ -88,7 +88,7 @@ class TestSentryTUIApp:
                 app.action_quit()
 
                 # Verify interceptor was stopped
-                interceptor.stop.assert_called_once()
+                interceptor.stop.assert_called_once()  # type: ignore
 
                 # Verify exit was called
                 mock_exit.assert_called_once()
@@ -425,4 +425,4 @@ class TestSentryTUIApp:
             app.action_quit()
 
             # Verify interceptor was stopped
-            interceptor.stop.assert_called_once()
+            interceptor.stop.assert_called_once()  # type: ignore
