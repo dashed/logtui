@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Updated Makefile to follow modern uv best practices for 2024-2025
+- Replaced `uv pip install -e .` with `uv sync` for dependency management
+- Added portable timeout handling for cross-platform compatibility
+- Enhanced development workflow with `make dev` target
+- Added note about `uv run` automatically handling dependency syncing
+
 ### Added
 - Initial project structure with `uv` package management
 - PTY-based interception system for capturing process output while preserving terminal behavior
