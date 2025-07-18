@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Service Toggle Bar**: Horizontal bar with checkboxes to show/hide specific services in real-time
 - Comprehensive ANSI escape code regex ported from Node.js chalk library for robust terminal output parsing
 - ANSI background color stripping function to prevent color bleeding while preserving foreground colors and formatting
 - Rich-based coloring system to replace ANSI codes with clean, reliable styling

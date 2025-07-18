@@ -15,10 +15,11 @@ import time
 import re
 from typing import List, Callable, Optional
 from textual.app import App, ComposeResult
-from textual.widgets import RichLog, Input, Footer, Header
-from textual.containers import Vertical
+from textual.widgets import RichLog, Input, Footer, Header, Checkbox
+from textual.containers import Vertical, Horizontal
 from textual.reactive import reactive
 from textual.binding import Binding
+from textual.message import Message
 from rich.text import Text
 
 
@@ -142,6 +143,48 @@ SENTRY_SERVICE_COLORS = {
     "celery-beat": (255, 86, 124),  # Same as cron
     "taskworker": (255, 194, 39),  # Same as worker
 }
+
+
+class ServiceToggleBar(Horizontal):
+    """A horizontal bar containing toggle checkboxes for each service."""
+    
+    def __init__(self, services: List[str], **kwargs):
+        super().__init__(**kwargs)
+        self.services = services
+        self.enabled_services = set(services)  # All services enabled by default
+    
+    def compose(self) -> ComposeResult:
+        """Compose the service toggle checkboxes."""
+        for service in self.services:
+            yield Checkbox(
+                f"[b]{service}[/b]", 
+                value=True,  # All services enabled by default
+                id=f"service_{service}"
+            )
+    
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        """Handle checkbox state changes."""
+        if event.checkbox.id and event.checkbox.id.startswith("service_"):
+            service_name = event.checkbox.id.replace("service_", "")
+            if event.checkbox.value:
+                self.enabled_services.add(service_name)
+            else:
+                self.enabled_services.discard(service_name)
+            
+            # Notify parent app about the change
+            self.post_message(self.ServiceToggled(service_name, event.checkbox.value))
+    
+    class ServiceToggled(Message):
+        """Message sent when a service is toggled."""
+        
+        def __init__(self, service: str, enabled: bool):
+            self.service = service
+            self.enabled = enabled
+            super().__init__()
+    
+    def is_service_enabled(self, service: str) -> bool:
+        """Check if a service is enabled."""
+        return service in self.enabled_services
 
 
 class LogLine:
@@ -394,6 +437,10 @@ class SentryTUIApp(App):
         yield Header()
         yield Vertical(
             Input(placeholder="Filter logs...", id="filter_input"),
+            ServiceToggleBar(
+                services=list(SENTRY_SERVICE_COLORS.keys()),
+                id="service_toggle_bar"
+            ),
             RichLog(id="log_display", auto_scroll=True),
             id="main_container",
         )
@@ -415,6 +462,11 @@ class SentryTUIApp(App):
         if event.input.id == "filter_input":
             self.filter_text = event.value
             self.update_log_display()
+    
+    def on_service_toggle_bar_service_toggled(self, event: ServiceToggleBar.ServiceToggled) -> None:
+        """Handle service toggle events."""
+        # Update the log display when service toggles change
+        self.update_log_display()
 
     def handle_log_output(self, line: str) -> None:
         """Handle new log output from the intercepted process."""
@@ -433,6 +485,12 @@ class SentryTUIApp(App):
 
     def matches_filter(self, log_line: LogLine) -> bool:
         """Check if a log line matches the current filter."""
+        # Check if service is enabled in toggle bar
+        service_toggle_bar = self.query_one("#service_toggle_bar", ServiceToggleBar)
+        if not service_toggle_bar.is_service_enabled(log_line.service):
+            return False
+        
+        # Check text filter
         if not self.filter_text:
             return True
 
