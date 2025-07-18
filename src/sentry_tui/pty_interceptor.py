@@ -14,7 +14,6 @@ This module has been refactored into separate modules for better maintainability
 """
 
 import sys
-from typing import List
 
 # Import all the main classes that users will need
 from .app import SentryTUIApp
@@ -27,16 +26,16 @@ from .utils import apply_rich_coloring, strip_ansi_codes, strip_ansi_background_
 # Export the main classes for backward compatibility
 __all__ = [
     "SentryTUIApp",
-    "PTYInterceptor", 
+    "PTYInterceptor",
     "ProcessState",
     "LogLine",
     "ServiceToggleBar",
-    "ProcessStatusBar", 
+    "ProcessStatusBar",
     "CommandEditScreen",
     "strip_ansi_codes",
     "strip_ansi_background_colors",
     "apply_rich_coloring",
-    "main"
+    "main",
 ]
 
 

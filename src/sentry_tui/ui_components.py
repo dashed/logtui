@@ -61,7 +61,7 @@ class ServiceToggleBar(Horizontal):
                 self.enabled_services.add(service_name)
             else:
                 self.enabled_services.discard(service_name)
-            
+
             # Notify parent app about the change
             self.post_message(self.ServiceToggled(service_name, event.checkbox.value))
 
@@ -134,23 +134,23 @@ class ProcessStatusBar(Horizontal):
         # Update process info display
         process_info_display = self.query_one("#process_info_display")
         info_parts = []
-        
+
         if pid:
             info_parts.append(f"PID: {pid}")
-        
+
         if self.ports:
             ports_str = ",".join(map(str, self.ports))
             info_parts.append(f"Ports: {ports_str}")
-        
-        if self.process_info.get('memory_mb'):
+
+        if self.process_info.get("memory_mb"):
             info_parts.append(f"Memory: {self.process_info['memory_mb']}MB")
-            
-        if self.process_info.get('cpu_percent') is not None:
+
+        if self.process_info.get("cpu_percent") is not None:
             info_parts.append(f"CPU: {self.process_info['cpu_percent']}%")
-            
+
         if restart_count > 0:
             info_parts.append(f"Restarts: {restart_count}")
-            
+
         if command:
             # Truncate command if too long to preserve space for other info
             display_command = command if len(command) <= 40 else command[:37] + "..."
@@ -209,16 +209,18 @@ class CommandEditScreen(ModalScreen):
         """Compose the command edit dialog."""
         with Container(id="edit_dialog"):
             yield Label("Edit Command", id="edit_title")
-            
+
             if self.previous_command:
-                yield Label(f"Previous: {self.previous_command}", id="previous_command_label")
-                
+                yield Label(
+                    f"Previous: {self.previous_command}", id="previous_command_label"
+                )
+
             yield Input(
                 value=self.current_command,
                 placeholder="Enter command to run (e.g., getsentry devserver --workers)",
-                id="command_input"
+                id="command_input",
             )
-            
+
             with Horizontal(id="edit_buttons"):
                 yield Button("Save", variant="primary", id="save_button")
                 yield Button("Cancel", variant="default", id="cancel_button")

@@ -99,7 +99,9 @@ class LogLine:
         clean_content = strip_ansi_codes(self.content)
 
         # Look for pattern: HH:MM:SS service_name | message
-        match = re.match(r"^\d{2}:\d{2}:\d{2}\s+[a-zA-Z0-9._-]+\s*\|\s*(.*)", clean_content)
+        match = re.match(
+            r"^\d{2}:\d{2}:\d{2}\s+[a-zA-Z0-9._-]+\s*\|\s*(.*)", clean_content
+        )
         if match:
             return match.group(1).strip()
 

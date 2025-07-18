@@ -4,7 +4,7 @@ from typing import List
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Vertical
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Input, RichLog
 
@@ -17,7 +17,7 @@ from .utils import apply_rich_coloring
 
 class SentryTUIApp(App):
     """Main TUI application for intercepting and filtering Sentry devserver logs."""
-    
+
     CSS = """
     Screen {
         layers: base overlay;
@@ -89,7 +89,7 @@ class SentryTUIApp(App):
         Binding("a", "toggle_auto_restart", "Toggle Auto-restart"),
         Binding("e", "edit_command", "Edit Command"),
     ]
-    
+
     filter_text = reactive("")
     paused = reactive(False)
     line_count = reactive(0)
@@ -311,6 +311,7 @@ class SentryTUIApp(App):
 
     async def action_edit_command(self) -> None:
         """Edit the command to be run."""
+
         def update_command(new_command: str) -> None:
             if new_command is not None:
                 # Store previous command
@@ -324,11 +325,11 @@ class SentryTUIApp(App):
                     self.interceptor.command = new_command_list
                 # Update status display
                 self.update_process_status()
-                
+
         # Show the edit dialog
-        result = await self.push_screen(
+        await self.push_screen(
             CommandEditScreen(self.current_command, self.previous_command),
-            update_command
+            update_command,
         )
 
     def on_unmount(self) -> None:

@@ -1,9 +1,8 @@
 """Utility functions for sentry-tui."""
 
-import re
 from rich.text import Text
 
-from .constants import ANSI_ESCAPE_REGEX, SENTRY_SERVICE_COLORS
+from .constants import ANSI_ESCAPE_REGEX
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -53,17 +52,18 @@ def apply_rich_coloring(text: str) -> Text:
 
 def strip_ansi_background_colors(text: str) -> str:
     """Strip ANSI background color codes while preserving foreground colors and formatting.
-    
+
     This function removes background color codes (codes 40-49, 100-109) while keeping
     foreground colors and text formatting intact. This prevents color bleeding in the TUI
     while maintaining readable colored text.
-    
+
     Args:
         text: Text potentially containing ANSI codes
-        
+
     Returns:
         Text with background colors removed but foreground colors preserved
     """
+
     def replace_bg_codes(match):
         """Replace background color codes while preserving other codes."""
         full_code = match.group(0)
@@ -103,6 +103,6 @@ def strip_ansi_background_colors(text: str) -> str:
 
         # Reconstruct the escape sequence
         return f"\x1b[{';'.join(filtered_parts)}m"
-    
+
     # Apply the background color removal
     return ANSI_ESCAPE_REGEX.sub(replace_bg_codes, text)

@@ -18,9 +18,7 @@ class TestSentryTUIApp:
     @pytest.fixture
     def mock_interceptor(self):
         """Mock PTYInterceptor for testing."""
-        with patch(
-            "sentry_tui.app.PTYInterceptor"
-        ) as mock_interceptor_class:
+        with patch("sentry_tui.app.PTYInterceptor") as mock_interceptor_class:
             mock_interceptor = Mock()
             # Configure get_status to return a proper dictionary
             mock_interceptor.get_status.return_value = {
@@ -619,9 +617,7 @@ class TestProcessControlActions:
     @pytest.fixture
     def mock_interceptor(self):
         """Mock PTYInterceptor for testing."""
-        with patch(
-            "sentry_tui.app.PTYInterceptor"
-        ) as mock_interceptor_class:
+        with patch("sentry_tui.app.PTYInterceptor") as mock_interceptor_class:
             mock_interceptor = Mock()
             mock_interceptor.get_status.return_value = {
                 "state": ProcessState.RUNNING,
