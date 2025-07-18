@@ -213,7 +213,10 @@ class EnhancedStatusBar(Static):
     """Enhanced status bar showing comprehensive information."""
 
     def __init__(self, **kwargs):
-        super().__init__("ENHANCED STATUS BAR VISIBLE - Filter: none | Lines: 0 | Services: none", **kwargs)
+        super().__init__(
+            "ENHANCED STATUS BAR VISIBLE - Filter: none | Lines: 0 | Services: none",
+            **kwargs,
+        )
         self.total_lines = 0
         self.filtered_lines = 0
         self.active_filter = ""
@@ -239,27 +242,35 @@ class EnhancedStatusBar(Static):
         self.memory_usage = memory_usage
 
         # Build the status text
-        filter_text = f"Filter: [bold]{active_filter}[/bold]" if active_filter else "Filter: [dim]none[/dim]"
-        
+        filter_text = (
+            f"Filter: [bold]{active_filter}[/bold]"
+            if active_filter
+            else "Filter: [dim]none[/dim]"
+        )
+
         if active_filter and filtered_lines != total_lines:
             line_text = f"Lines: [bold]{filtered_lines:,}[/bold] / {total_lines:,}"
         else:
             line_text = f"Lines: [bold]{total_lines:,}[/bold]"
-            
-        service_text = f"Services: [bold]{service_count}[/bold]" if service_count > 0 else "Services: [dim]none[/dim]"
-        
+
+        service_text = (
+            f"Services: [bold]{service_count}[/bold]"
+            if service_count > 0
+            else "Services: [dim]none[/dim]"
+        )
+
         metrics_parts = []
         if logs_per_sec > 0:
             metrics_parts.append(f"{logs_per_sec:.1f}/s")
         if memory_usage > 0:
             metrics_parts.append(f"{memory_usage}MB")
         metrics_text = " | ".join(metrics_parts) if metrics_parts else ""
-        
+
         # Update the Static widget content
         status_parts = [filter_text, line_text, service_text]
         if metrics_text:
             status_parts.append(metrics_text)
-        
+
         self.update(" | ".join(status_parts))
 
 

@@ -614,33 +614,33 @@ class TestServiceToggleBar:
     async def test_smart_toggle_all_functionality(self):
         """Test that smart toggle all works correctly."""
         service_toggle_bar = ServiceToggleBar()
-        
+
         # Add some services
         service_toggle_bar.add_service("server")
         service_toggle_bar.add_service("worker")
         service_toggle_bar.add_service("webpack")
-        
+
         # Initially all services should be enabled
         assert len(service_toggle_bar.enabled_services) == 3
         assert "server" in service_toggle_bar.enabled_services
         assert "worker" in service_toggle_bar.enabled_services
         assert "webpack" in service_toggle_bar.enabled_services
-        
+
         # Test smart toggle: all enabled -> all disabled
         service_toggle_bar.smart_toggle_all()
         assert len(service_toggle_bar.enabled_services) == 0
-        
+
         # Test smart toggle: all disabled -> all enabled
         service_toggle_bar.smart_toggle_all()
         assert len(service_toggle_bar.enabled_services) == 3
         assert "server" in service_toggle_bar.enabled_services
         assert "worker" in service_toggle_bar.enabled_services
         assert "webpack" in service_toggle_bar.enabled_services
-        
+
         # Test smart toggle: mixed state -> all enabled
         service_toggle_bar.enabled_services.discard("worker")  # disable one
         assert len(service_toggle_bar.enabled_services) == 2
-        
+
         service_toggle_bar.smart_toggle_all()
         assert len(service_toggle_bar.enabled_services) == 3
         assert "server" in service_toggle_bar.enabled_services
@@ -655,7 +655,7 @@ class TestEnhancedStatusBar:
     async def test_enhanced_status_bar_initialization(self):
         """Test that EnhancedStatusBar initializes correctly."""
         from sentry_tui.ui_components import EnhancedStatusBar
-        
+
         enhanced_status_bar = EnhancedStatusBar()
         assert enhanced_status_bar.total_lines == 0
         assert enhanced_status_bar.filtered_lines == 0
@@ -668,14 +668,14 @@ class TestEnhancedStatusBar:
     async def test_enhanced_status_bar_update_status(self):
         """Test that EnhancedStatusBar updates status correctly."""
         from sentry_tui.ui_components import EnhancedStatusBar
-        
+
         enhanced_status_bar = EnhancedStatusBar()
-        
+
         # Mock the compose and mounting
-        with patch.object(enhanced_status_bar, 'query_one') as mock_query:
+        with patch.object(enhanced_status_bar, "query_one") as mock_query:
             mock_static = Mock()
             mock_query.return_value = mock_static
-            
+
             enhanced_status_bar.update_status(
                 total_lines=100,
                 filtered_lines=50,
@@ -684,7 +684,7 @@ class TestEnhancedStatusBar:
                 logs_per_sec=5.5,
                 memory_usage=10,
             )
-            
+
             assert enhanced_status_bar.total_lines == 100
             assert enhanced_status_bar.filtered_lines == 50
             assert enhanced_status_bar.active_filter == "test"
@@ -700,8 +700,9 @@ class TestEnhancedStatusBar:
 
         async with app.run_test():
             # Check that enhanced status bar is present
-            from sentry_tui.ui_components import EnhancedStatusBar
-            enhanced_status_bar = app.query_one("#enhanced_status_bar", EnhancedStatusBar)
+            from textual.widgets import Static
+
+            enhanced_status_bar = app.query_one("#enhanced_status_bar", Static)
             assert enhanced_status_bar is not None
 
     @pytest.mark.asyncio
@@ -716,14 +717,14 @@ class TestEnhancedStatusBar:
                 # Add some log lines
                 app.handle_log_output("01:23:45 server | Test log 1")
                 app.handle_log_output("01:23:46 worker | Test log 2")
-                
+
                 # Let the app process
                 await app.workers.wait_for_complete()
-                
+
                 # Check that line count increased
                 assert app.line_count == 2
                 assert len(app.discovered_services) == 2
-                
+
                 # Verify that performance tracking is working
                 assert len(app.log_timestamps) == 2
 

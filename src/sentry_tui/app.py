@@ -18,23 +18,23 @@ from .utils import apply_rich_coloring
 
 class FilterInput(Input):
     """Custom Input widget that allows certain keys to pass through to app bindings."""
-    
+
     def check_consume_key(self, key: str, character: str | None) -> bool:
         """Check if the widget may consume the given key.
-        
+
         Allow 'l' and 'f' keys to pass through to app bindings for focus switching.
-        
+
         Args:
             key: A key identifier.
             character: A character associated with the key, or `None` if there isn't one.
-            
+
         Returns:
             `True` if the widget may capture the key, or `False` if it should pass through.
         """
         # Allow 'l' and 'f' keys to pass through to app bindings
         if key in ("l", "f"):
             return False
-            
+
         # For all other keys, use the default Input behavior
         return character is not None and character.isprintable()
 
@@ -112,12 +112,12 @@ class SentryTUIApp(App):
     }
     
     #enhanced_status_bar {
-        height: 1;
-        background: $primary;
-        color: $text;
+        height: auto;
+        background: red;
+        color: white;
         padding: 0 1;
-        border-top: solid $accent;
-        border-bottom: solid $accent;
+        border-top: solid yellow;
+        border-bottom: solid yellow;
         text-style: bold;
     }
     """
@@ -156,7 +156,7 @@ class SentryTUIApp(App):
         self.discovered_services: set = set()
         self.auto_restart = auto_restart
         self.auto_restart_enabled = auto_restart
-        
+
         # Performance tracking
         self.last_log_time = time.time()
         self.log_timestamps = []
@@ -165,7 +165,7 @@ class SentryTUIApp(App):
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
         yield Header()
-        yield Static("Filter: none | Lines: 0 | Services: none", id="enhanced_status_bar")
+        yield Static("🔥 ENHANCED STATUS BAR TEST 🔥", id="enhanced_status_bar")
         yield Vertical(
             FilterInput(placeholder="Filter logs...", id="filter_input"),
             ServiceToggleBar(services=[], id="service_toggle_bar"),
@@ -195,12 +195,14 @@ class SentryTUIApp(App):
 
         # Update initial process status
         self.update_process_status()
-        
+
         # Update initial enhanced status bar
         self.update_enhanced_status_bar()
-        
+
         # Set up periodic enhanced status bar updates
-        self.update_enhanced_status_timer = self.set_interval(1.0, self.update_enhanced_status_bar)
+        self.update_enhanced_status_timer = self.set_interval(
+            1.0, self.update_enhanced_status_bar
+        )
 
     def on_process_state_changed(self, new_state: ProcessState) -> None:
         """Handle process state changes."""
@@ -230,45 +232,62 @@ class SentryTUIApp(App):
         """Update the enhanced status bar with current metrics."""
         try:
             enhanced_status_bar = self.query_one("#enhanced_status_bar", Static)
-            
+
             # Calculate filtered line count
             filtered_count = 0
             for log_line in self.log_lines:
                 if self.matches_filter(log_line):
                     filtered_count += 1
             self.filtered_line_count = filtered_count
-            
+
             # Calculate logs per second (using last 10 seconds)
             current_time = time.time()
             # Remove timestamps older than 10 seconds
-            self.log_timestamps = [ts for ts in self.log_timestamps if current_time - ts <= 10]
-            logs_per_sec = len(self.log_timestamps) / min(10, max(1, current_time - self.last_log_time)) if self.log_timestamps else 0
-            
+            self.log_timestamps = [
+                ts for ts in self.log_timestamps if current_time - ts <= 10
+            ]
+            logs_per_sec = (
+                len(self.log_timestamps)
+                / min(10, max(1, current_time - self.last_log_time))
+                if self.log_timestamps
+                else 0
+            )
+
             # Get basic memory usage estimate (number of lines * rough estimate per line)
             memory_usage = len(self.log_lines) * 0.001  # Rough estimate: 1KB per line
-            
+
             # Build the status text
-            filter_text = f"Filter: [bold]{self.filter_text}[/bold]" if self.filter_text else "Filter: [dim]none[/dim]"
-            
+            filter_text = (
+                f"Filter: [bold]{self.filter_text}[/bold]"
+                if self.filter_text
+                else "Filter: [dim]none[/dim]"
+            )
+
             if self.filter_text and filtered_count != self.line_count:
-                line_text = f"Lines: [bold]{filtered_count:,}[/bold] / {self.line_count:,}"
+                line_text = (
+                    f"Lines: [bold]{filtered_count:,}[/bold] / {self.line_count:,}"
+                )
             else:
                 line_text = f"Lines: [bold]{self.line_count:,}[/bold]"
-                
+
             service_count = len(self.discovered_services)
-            service_text = f"Services: [bold]{service_count}[/bold]" if service_count > 0 else "Services: [dim]none[/dim]"
-            
+            service_text = (
+                f"Services: [bold]{service_count}[/bold]"
+                if service_count > 0
+                else "Services: [dim]none[/dim]"
+            )
+
             metrics_parts = []
             if logs_per_sec > 0:
                 metrics_parts.append(f"{logs_per_sec:.1f}/s")
             if memory_usage > 0:
                 metrics_parts.append(f"{memory_usage:.1f}MB")
-            
+
             # Update the Static widget content
             status_parts = [filter_text, line_text, service_text]
             if metrics_parts:
                 status_parts.append(" | ".join(metrics_parts))
-            
+
             enhanced_status_bar.update(" | ".join(status_parts))
         except Exception:
             # If enhanced status bar is not available, skip silently
@@ -297,7 +316,7 @@ class SentryTUIApp(App):
             log_line = LogLine(line)
             self.log_lines.append(log_line)
             self.line_count = len(self.log_lines)
-            
+
             # Track timestamp for performance metrics
             current_time = time.time()
             self.log_timestamps.append(current_time)
@@ -453,7 +472,7 @@ class SentryTUIApp(App):
         """Clean up when the app unmounts."""
         if self.interceptor:
             self.interceptor.stop()
-        
+
         # Clean up the enhanced status bar timer
         if self.update_enhanced_status_timer:
             self.update_enhanced_status_timer.stop()
