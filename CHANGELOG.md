@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Comprehensive ANSI escape code regex ported from Node.js chalk library for robust terminal output parsing
 - Comprehensive test suite using pytest and textual testing framework
 - Test configuration with `pytest.ini` for asyncio support
 - Shared test fixtures in `conftest.py` for mocking system components
@@ -20,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Makefile test targets for different test suites
 
 ### Changed
+- Updated LogLine implementation to match exact Sentry devserver log format with SentryPrinter + HumanRenderer patterns
+- Updated dummy app to emit logs in exact Sentry format with proper ANSI color codes and timestamps
+- Updated all tests to use exact Sentry log format patterns instead of simulated formats
+- Updated SERVICE_COLORS to match exact Sentry color scheme from source code
+- Replaced simple ANSI regex with comprehensive escape code handling for better terminal compatibility
 - Updated Makefile to follow modern uv best practices for 2024-2025
 - Replaced `uv pip install -e .` with `uv sync` for dependency management
 - Added portable timeout handling for cross-platform compatibility
@@ -30,12 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed test data to use correct timestamp format (HH:MM:SS instead of full datetime)
 
 ### Fixed
+- Integration test method signature compatibility with updated dummy app format
 - CSS parsing error: Changed `layers: base, overlay;` to `layers: base overlay;` following Textual CSS syntax
 - Reactive variable declarations moved from `__init__` to class level for proper Textual behavior
 - Key binding tests now properly handle Input widget focus management
 - Threading issues in memory management tests resolved with proper mocking
 - Integration test async decorator and timing issues for reliable test execution
-- All 96 tests now pass successfully (previously 38 failures reduced to 0)
+- All 88 tests now pass successfully (previously had failing tests due to format mismatches)
 - Initial project structure with `uv` package management
 - PTY-based interception system for capturing process output while preserving terminal behavior
 - Dummy app that simulates Sentry devserver log output with:
