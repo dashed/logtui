@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Comprehensive test suite using pytest and textual testing framework
+- Test configuration with `pytest.ini` for asyncio support
+- Shared test fixtures in `conftest.py` for mocking system components
+- Unit tests for LogLine class with service extraction and timestamp handling
+- Unit tests for PTYInterceptor class with mocking of system calls
+- TUI interaction tests for SentryTUIApp with async support
+- Log filtering tests with parametrized test cases
+- Integration tests with real dummy app execution
+- Test categorization with markers (unit, integration, slow, fast)
+- Makefile test targets for different test suites
+
 ### Changed
 - Updated Makefile to follow modern uv best practices for 2024-2025
 - Replaced `uv pip install -e .` with `uv sync` for dependency management
@@ -14,8 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced development workflow with `make dev` target
 - Added note about `uv run` automatically handling dependency syncing
 - Fixed type annotations to satisfy ty type checker requirements
-
-### Added
+- Updated service extraction regex to support hyphenated service names (e.g., "celery-beat")
+- Fixed test data to use correct timestamp format (HH:MM:SS instead of full datetime)
 - Initial project structure with `uv` package management
 - PTY-based interception system for capturing process output while preserving terminal behavior
 - Dummy app that simulates Sentry devserver log output with:

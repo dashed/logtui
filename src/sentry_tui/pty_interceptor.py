@@ -30,12 +30,20 @@ class LogLine:
 
     def _extract_service(self) -> str:
         """Extract service name from Honcho-style log line."""
-        # Look for service name pattern: "  service_name | timestamp message"
+        # Look for service name pattern: "  service_name  timestamp message"
+        # Also handle patterns like "  service_name | timestamp message" 
         import re
 
-        match = re.match(r"\s*(\w+)\s+\|\s+", self.content)
+        # Try pattern with pipe separator first: "  service_name | timestamp message"
+        match = re.match(r"\s*([a-zA-Z0-9_-]+)\s+\|\s+", self.content)
         if match:
             return match.group(1)
+        
+        # Try pattern without pipe separator: "  service_name  timestamp message"
+        match = re.match(r"\s*([a-zA-Z0-9_-]+)\s+\d+:\d+:\d+", self.content)
+        if match:
+            return match.group(1)
+        
         return "unknown"
 
 
