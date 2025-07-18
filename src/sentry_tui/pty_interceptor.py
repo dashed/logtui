@@ -298,21 +298,26 @@ class LogLine:
         self.message = self._extract_message()
 
     def _extract_service(self) -> str:
-        """Extract service name from Sentry SentryPrinter format.
+        """Extract service name from Sentry Honcho format.
 
-        Format: {colored_service_name} {colored_indicator} HH:MM:SS [LEVEL] module.name: message
+        Format: HH:MM:SS service_name | log_message
 
-        The service name appears at the beginning with ANSI color codes.
-        We need to strip ANSI codes and extract the service name.
+        Examples:
+        - "06:40:47 system  | webpack started (pid=83946)"
+        - "06:40:48 server  | Using configuration 'getsentry.conf.settings.dev'"
+        - "06:40:51 webpack | <i> [webpack-dev-server] [HPM] Proxy created..."
+
+        Source Code References:
+        - Honcho process manager: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:507-509
+        - SentryPrinter format logic: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:78-120
+        - Service names from daemons: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:21-27
+        - Color scheme: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:18-24
         """
         # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
 
-        # Look for service name at the beginning, followed by space and timestamp
-        # Pattern: "service_name HH:MM:SS [LEVEL] module.name: message"
-        match = re.match(
-            r"^\s*([a-zA-Z0-9_-]+)\s+\d{2}:\d{2}:\d{2}\s+\[", clean_content
-        )
+        # Look for pattern: HH:MM:SS service_name |
+        match = re.match(r"^\d{2}:\d{2}:\d{2}\s+([a-zA-Z0-9._-]+)\s*\|", clean_content)
         if match:
             return match.group(1).strip()
 
@@ -324,45 +329,64 @@ class LogLine:
         return "unknown"
 
     def _extract_level(self) -> str:
-        """Extract log level from HumanRenderer format: HH:MM:SS [LEVEL] module.name: message"""
+        """Extract log level from Sentry Honcho format: HH:MM:SS service_name | log_message
+
+        Since Honcho format doesn't include explicit log levels, we infer from content.
+
+        Source Code References:
+        - Honcho doesn't add log levels: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:110-118
+        - Original services just output raw logs to Honcho
+        - Log level inference based on common error patterns
+        """
         # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
 
-        # Look for [LEVEL] pattern
-        match = re.search(
-            r"\[(DEBUG|INFO|WARNING|ERROR|CRITICAL|FATAL)\]", clean_content
-        )
-        if match:
-            return match.group(1)
+        # Look for common error indicators
+        content_lower = clean_content.lower()
+        if any(
+            word in content_lower
+            for word in ["error", "exception", "traceback", "failed", "critical"]
+        ):
+            return "ERROR"
+        elif any(word in content_lower for word in ["warning", "warn", "deprecated"]):
+            return "WARNING"
+        elif any(word in content_lower for word in ["debug"]):
+            return "DEBUG"
 
         return "INFO"  # Default level
 
     def _extract_module_name(self) -> str:
-        """Extract module name from HumanRenderer format: HH:MM:SS [LEVEL] module.name: message"""
-        # Remove ANSI color codes first
-        clean_content = strip_ansi_codes(self.content)
+        """Extract module name from Sentry Honcho format: HH:MM:SS service_name | log_message
 
-        # Look for pattern after [LEVEL]: module.name: message
-        match = re.search(r"\[\w+\]\s+([^:]+):", clean_content)
-        if match:
-            return match.group(1).strip()
+        Since Honcho format doesn't include explicit module names, we use the service name.
 
-        return "root"  # Default module name
+        Source Code References:
+        - Service names are process names: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:21-27
+        - Honcho manages these as separate processes: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:511-517
+        - No module-level granularity in this format
+        """
+        # Use service name as module name since no explicit module in this format
+        return self.service
 
     def _extract_message(self) -> str:
-        """Extract the actual log message from HumanRenderer format"""
+        """Extract the actual log message from Sentry Honcho format: HH:MM:SS service_name | log_message
+
+        Source Code References:
+        - Raw message output: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:116-118
+        - Honcho adds timestamp and service prefix: honcho.printer.Printer (external library)
+        - SentryPrinter adds ANSI colors but preserves message content
+        """
         # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
 
-        # Look for message after module.name:
-        match = re.search(r"\[\w+\]\s+[^:]+:\s*(.*)$", clean_content)
+        # Look for message after the pipe separator
+        match = re.search(
+            r"^\d{2}:\d{2}:\d{2}\s+[a-zA-Z0-9._-]+\s*\|\s*(.*)$", clean_content
+        )
         if match:
             return match.group(1).strip()
 
-        # Fallback: return content after first colon if any
-        if ":" in clean_content:
-            return clean_content.split(":", 1)[1].strip()
-
+        # Fallback: return the entire clean content
         return clean_content.strip()
 
 

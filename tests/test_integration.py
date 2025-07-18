@@ -29,16 +29,14 @@ class TestIntegration:
         assert "server" in colored_server
         assert "\033[" in colored_server  # ANSI escape code
 
-        # Test log line formatting
-        log_line = app._format_log_line(
-            "server", "INFO", "sentry.web.frontend", "GET 200 /api/0/projects/"
-        )
+        # Test log line formatting (new Honcho format: service and message only)
+        log_line = app._format_log_line("server", "GET 200 /api/0/projects/")
         assert "server" in log_line
         assert "GET 200 /api/0/projects/" in log_line
         assert "\033[" in log_line  # ANSI escape code
 
-        # Test random log message generation
-        service, level, module, message = app._get_random_log_message()
+        # Test random log message generation (new format returns service and message only)
+        service, message = app._get_random_log_message()
         assert service in [
             "server",
             "worker",
@@ -46,9 +44,9 @@ class TestIntegration:
             "webpack",
             "taskworker",
             "getsentry-outcomes",
+            "system",  # Added system service from new format
         ]
-        assert level in ["DEBUG", "INFO", "WARNING", "ERROR"]
-        assert isinstance(module, str)
+        assert isinstance(service, str)
         assert isinstance(message, str)
         assert len(message) > 0
 

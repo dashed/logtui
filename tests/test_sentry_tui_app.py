@@ -469,12 +469,12 @@ class TestServiceToggleBar:
         async with app.run_test():
             # Mock call_from_thread to avoid threading issues
             with patch.object(app, "call_from_thread") as mock_call_from_thread:
-                # Simulate log lines with different services
+                # Simulate log lines with different services (Honcho format: HH:MM:SS service | message)
                 test_logs = [
-                    "server 01:23:45 [INFO] django.request: GET /api/health",
-                    "worker 01:23:46 [DEBUG] celery.worker: Task received",
-                    "webpack 01:23:47 [INFO] webpack: Compiled successfully",
-                    "custom-service 01:23:48 [ERROR] custom.module: Something failed",
+                    "01:23:45 server | GET /api/health",
+                    "01:23:46 worker | Task received",
+                    "01:23:47 webpack | Compiled successfully",
+                    "01:23:48 custom-service | Something failed",
                 ]
 
                 for log_line in test_logs:
@@ -534,14 +534,10 @@ class TestServiceToggleBar:
             service_toggle_bar.add_service("worker")
             service_toggle_bar.add_service("custom-service")
 
-            # Create test log lines
-            server_log = LogLine(
-                "server 01:23:45 [INFO] django.request: GET /api/health"
-            )
-            worker_log = LogLine("worker 01:23:46 [DEBUG] celery.worker: Task received")
-            custom_log = LogLine(
-                "custom-service 01:23:48 [ERROR] custom.module: Something failed"
-            )
+            # Create test log lines (Honcho format: HH:MM:SS service | message)
+            server_log = LogLine("01:23:45 server | GET /api/health")
+            worker_log = LogLine("01:23:46 worker | Task received")
+            custom_log = LogLine("01:23:48 custom-service | Something failed")
 
             # All services enabled by default - all should match
             assert app.matches_filter(server_log)

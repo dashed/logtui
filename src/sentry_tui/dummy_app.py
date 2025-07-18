@@ -1,6 +1,14 @@
 #!/usr/bin/env python3
 """
-Dummy app that simulates Sentry devserver log output.
+Dummy app that simulates Sentry devserver log output in real Honcho format.
+
+Real Sentry devserver format: HH:MM:SS service_name | log_message
+
+Source Code References:
+- Honcho process manager: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:507-509
+- SentryPrinter formatting: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:78-120
+- Service definitions: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:21-27
+
 Logs output every few seconds with random intervals and handles Ctrl+C.
 """
 
@@ -30,69 +38,62 @@ SERVICE_COLORS = {
 
 RESET = "\033[0m"
 
-# Sample log messages in exact Sentry HumanRenderer format: [LEVEL] module.name: message
+# Sample log messages in Sentry Honcho format: service_name and raw message content
+# Based on real devserver logs and source code analysis
+# Source: /Users/me/aaa/sentry/sentry/src/sentry/runner/commands/devserver.py:21-27 (service names)
 LOG_MESSAGES = [
-    ("server", "INFO", "sentry.web.frontend", "GET 200 /api/0/projects/"),
-    ("server", "INFO", "sentry.web.frontend", "POST 201 /api/0/events/"),
-    ("server", "WARNING", "sentry.web.frontend", "GET 404 /api/0/nonexistent/"),
-    ("server", "INFO", "sentry.web.api", "GET 200 /api/0/organizations/"),
-    ("worker", "INFO", "sentry.tasks.process_event", "Task completed: process_event"),
+    ("system", "webpack started (pid=83946)"),
+    ("system", "server started (pid=83945)"),
+    ("server", "Using configuration 'getsentry.conf.settings.dev'"),
+    ("server", "*** Starting uWSGI 2.0.28 (64bit) on [Mon Jan 15 06:40:52 2024] ***"),
     (
-        "worker",
-        "DEBUG",
-        "sentry.tasks.process_event",
-        "Processing event id=abc123def456",
+        "server",
+        "compiled with version: Apple LLVM 15.0.0 (clang-1500.3.9.4) on 31 October 2024 18:20:36",
     ),
-    ("worker", "INFO", "sentry.tasks.email", "Task started: send_email"),
-    ("worker", "INFO", "sentry.tasks.email", "Email sent to user@example.com"),
-    ("celery-beat", "INFO", "sentry.tasks.cleanup", "Running periodic task cleanup"),
-    ("celery-beat", "INFO", "sentry.tasks.digest", "Starting daily digest task"),
-    ("webpack", "INFO", "webpack.compiler", "Compiled successfully in 1234ms"),
+    ("server", "os: Darwin-24.3.0 Darwin Kernel Version 24.3.0"),
+    ("server", "detected number of CPU cores: 10"),
+    ("server", "current working directory: /Users/me/aaa/sentry/sentry"),
+    ("server", "GET 200 /api/0/projects/ http/1.1 1234"),
+    ("server", "POST 201 /api/0/events/ http/1.1 2345"),
+    ("server", "GET 404 /api/0/nonexistent/ http/1.1 123"),
     (
         "webpack",
-        "DEBUG",
-        "webpack.compiler",
-        "Hash: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-    ),
-    ("webpack", "INFO", "webpack.compiler", "Built at: 2024-01-15 14:32:01"),
-    ("taskworker", "INFO", "sentry.tasks.kafka", "Consuming from outcomes topic"),
-    ("taskworker", "DEBUG", "sentry.tasks.kafka", "Processed 50 events from Kafka"),
-    (
-        "getsentry-outcomes",
-        "INFO",
-        "getsentry.billing.outcomes",
-        "Processing billing outcomes",
+        "<i> [webpack-dev-server] [HPM] Proxy created: /api/store/**,/api/{1..9}*({0..9})/**,/api/0/relays/outcomes/**  -> http://127.0.0.1:7899",
     ),
     (
-        "getsentry-outcomes",
-        "DEBUG",
-        "getsentry.billing.outcomes",
-        "Outcome: event processed",
+        "webpack",
+        "<i> [webpack-dev-server] [HPM] Proxy created: !/_static/dist/sentry/**  -> http://127.0.0.1:8001/",
     ),
     (
-        "server",
-        "ERROR",
-        "sentry.api.endpoints.project_events",
-        "Traceback (most recent call last):",
+        "webpack",
+        "(node:83946) ExperimentalWarning: Type Stripping is an experimental feature and might change at any time",
+    ),
+    ("webpack", "<i> [webpack-dev-server] Project is running at:"),
+    ("webpack", "<i> [webpack-dev-server] Loopback: http://127.0.0.1:8000/"),
+    (
+        "webpack",
+        "<i> [webpack-dev-server] Content not from webpack is served from './src/sentry/static/sentry' directory",
     ),
     (
-        "server",
-        "ERROR",
-        "sentry.api.endpoints.project_events",
-        '  File "/app/sentry/api/endpoints/project_events.py", line 123, in get',
+        "worker",
+        "[2024-01-15 14:32:01,123: INFO/MainProcess] Connected to redis://127.0.0.1:6379/0",
+    ),
+    ("worker", "[2024-01-15 14:32:01,456: INFO/MainProcess] celery@hostname ready."),
+    (
+        "worker",
+        "[2024-01-15 14:32:01,789: INFO/ForkPoolWorker-1] Task sentry.tasks.process_event[abc-123-def] succeeded in 0.123s",
     ),
     (
-        "server",
-        "ERROR",
-        "sentry.api.endpoints.project_events",
-        '    raise ValueError("Invalid project ID")',
+        "celery-beat",
+        "[2024-01-15 14:32:00,000: INFO/MainProcess] Scheduler: Sending due task cleanup (sentry.tasks.cleanup)",
     ),
     (
-        "server",
-        "ERROR",
-        "sentry.api.endpoints.project_events",
-        "ValueError: Invalid project ID",
+        "celery-beat",
+        "[2024-01-15 14:32:00,100: INFO/MainProcess] Scheduler: Sending due task digest (sentry.tasks.digest)",
     ),
+    ("taskworker", "Starting task worker for outcomes processing"),
+    ("taskworker", "Consuming from kafka topic outcomes-consumer"),
+    ("taskworker", "Processed 50 events from Kafka in batch"),
 ]
 
 
@@ -122,76 +123,61 @@ class DummyApp:
         color = SERVICE_COLORS.get(service, "")
         return f"{color}{service:>12}{RESET}"
 
-    def _format_log_line(
-        self, service: str, level: str, module: str, message: str
-    ) -> str:
-        """Format log line to match exact Sentry SentryPrinter + HumanRenderer format.
+    def _format_log_line(self, service: str, message: str) -> str:
+        """Format log line to match exact Sentry Honcho format.
 
-        Final format: {colored_service_name} {colored_indicator} HH:MM:SS [LEVEL] module.name: message
+        Real format: HH:MM:SS service_name | log_message
+
+        Source Code References:
+        - Honcho adds timestamp: honcho.printer.Printer (external library)
+        - SentryPrinter format: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:110-118
+        - Service colors: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:18-24
         """
         timestamp = self._get_timestamp()
 
-        # Format the HumanRenderer part: HH:MM:SS [LEVEL] module.name: message
-        human_format = f"{timestamp} [{level}] {module}: {message}"
-
-        # Add SentryPrinter service prefix with exact format from formatting.py:110-118
+        # Add ANSI colors to match SentryPrinter behavior
         service_color = SERVICE_COLORS.get(service, "")
-        name_colored = f"{service_color}{service:>12}{RESET}"
-        indicator_colored = f"{service_color} {RESET}"
+        service_colored = f"{service_color}{service}{RESET}"
 
-        return f"{name_colored} {indicator_colored} {human_format}"
+        return f"{timestamp} {service_colored} | {message}"
 
-    def _get_random_log_message(self) -> tuple[str, str, str, str]:
+    def _get_random_log_message(self) -> tuple[str, str]:
         """Get a random log message."""
         return random.choice(LOG_MESSAGES)
 
     def _add_some_multiline_logs(self) -> List[str]:
         """Occasionally add multi-line log entries (like tracebacks)."""
         if random.random() < 0.1:  # 10% chance of multiline log
-            service, _, _, _ = self._get_random_log_message()
+            service, _ = self._get_random_log_message()
             lines = []
             lines.append(
                 self._format_log_line(
                     service,
-                    "ERROR",
-                    "sentry.models.event",
                     "Traceback (most recent call last):",
                 )
             )
             lines.append(
                 self._format_log_line(
                     service,
-                    "ERROR",
-                    "sentry.models.event",
                     '  File "/app/sentry/models/event.py", line 456, in process',
                 )
             )
-            lines.append(
-                self._format_log_line(
-                    service, "ERROR", "sentry.models.event", "    event.save()"
-                )
-            )
+            lines.append(self._format_log_line(service, "    event.save()"))
             lines.append(
                 self._format_log_line(
                     service,
-                    "ERROR",
-                    "sentry.models.event",
                     '  File "/app/sentry/models/event.py", line 234, in save',
                 )
             )
             lines.append(
                 self._format_log_line(
                     service,
-                    "ERROR",
-                    "sentry.models.event",
                     '    raise ValidationError("Invalid event data")',
                 )
             )
             lines.append(
                 self._format_log_line(
                     service,
-                    "ERROR",
-                    "sentry.models.event",
                     "ValidationError: Invalid event data",
                 )
             )
@@ -212,8 +198,8 @@ class DummyApp:
                     self.log_count += 1
 
                 # Regular log message
-                service, level, module, message = self._get_random_log_message()
-                formatted_line = self._format_log_line(service, level, module, message)
+                service, message = self._get_random_log_message()
+                formatted_line = self._format_log_line(service, message)
                 print(formatted_line)
                 self.log_count += 1
 
