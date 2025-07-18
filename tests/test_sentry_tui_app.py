@@ -648,6 +648,86 @@ class TestServiceToggleBar:
         assert "webpack" in service_toggle_bar.enabled_services
 
 
+class TestEnhancedStatusBar:
+    """Test cases for EnhancedStatusBar functionality."""
+
+    @pytest.mark.asyncio
+    async def test_enhanced_status_bar_initialization(self):
+        """Test that EnhancedStatusBar initializes correctly."""
+        from sentry_tui.ui_components import EnhancedStatusBar
+        
+        enhanced_status_bar = EnhancedStatusBar()
+        assert enhanced_status_bar.total_lines == 0
+        assert enhanced_status_bar.filtered_lines == 0
+        assert enhanced_status_bar.active_filter == ""
+        assert enhanced_status_bar.service_count == 0
+        assert enhanced_status_bar.logs_per_sec == 0
+        assert enhanced_status_bar.memory_usage == 0
+
+    @pytest.mark.asyncio
+    async def test_enhanced_status_bar_update_status(self):
+        """Test that EnhancedStatusBar updates status correctly."""
+        from sentry_tui.ui_components import EnhancedStatusBar
+        
+        enhanced_status_bar = EnhancedStatusBar()
+        
+        # Mock the compose and mounting
+        with patch.object(enhanced_status_bar, 'query_one') as mock_query:
+            mock_static = Mock()
+            mock_query.return_value = mock_static
+            
+            enhanced_status_bar.update_status(
+                total_lines=100,
+                filtered_lines=50,
+                active_filter="test",
+                service_count=3,
+                logs_per_sec=5.5,
+                memory_usage=10,
+            )
+            
+            assert enhanced_status_bar.total_lines == 100
+            assert enhanced_status_bar.filtered_lines == 50
+            assert enhanced_status_bar.active_filter == "test"
+            assert enhanced_status_bar.service_count == 3
+            assert enhanced_status_bar.logs_per_sec == 5.5
+            assert enhanced_status_bar.memory_usage == 10
+
+    @pytest.mark.asyncio
+    async def test_enhanced_status_bar_in_app(self):
+        """Test that EnhancedStatusBar is properly integrated in the app."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Check that enhanced status bar is present
+            from sentry_tui.ui_components import EnhancedStatusBar
+            enhanced_status_bar = app.query_one("#enhanced_status_bar", EnhancedStatusBar)
+            assert enhanced_status_bar is not None
+
+    @pytest.mark.asyncio
+    async def test_enhanced_status_bar_updates_with_logs(self):
+        """Test that EnhancedStatusBar updates when logs are added."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock call_from_thread to avoid threading issues
+            with patch.object(app, "call_from_thread"):
+                # Add some log lines
+                app.handle_log_output("01:23:45 server | Test log 1")
+                app.handle_log_output("01:23:46 worker | Test log 2")
+                
+                # Let the app process
+                await app.workers.wait_for_complete()
+                
+                # Check that line count increased
+                assert app.line_count == 2
+                assert len(app.discovered_services) == 2
+                
+                # Verify that performance tracking is working
+                assert len(app.log_timestamps) == 2
+
+
 class TestProcessControlActions:
     """Test cases for process control actions in SentryTUIApp."""
 

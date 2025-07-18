@@ -1,5 +1,6 @@
 """Main SentryTUI application."""
 
+import time
 from typing import List
 
 from textual.app import App, ComposeResult
@@ -11,7 +12,7 @@ from textual.widgets import Footer, Header, Input, RichLog
 from .constants import ProcessState
 from .log_processing import LogLine
 from .pty_core import PTYInterceptor
-from .ui_components import CommandEditScreen, ProcessStatusBar, ServiceToggleBar
+from .ui_components import CommandEditScreen, EnhancedStatusBar, ProcessStatusBar, ServiceToggleBar
 from .utils import apply_rich_coloring
 
 
@@ -105,6 +106,25 @@ class SentryTUIApp(App):
         padding: 0;
         width: auto;
     }
+    
+    #enhanced_status_bar {
+        height: 1;
+        background: $surface;
+        color: $text;
+        padding: 0 1;
+        border-top: solid $primary;
+        dock: bottom;
+    }
+    
+    #enhanced_status_bar Static {
+        margin: 0 1;
+        padding: 0;
+        width: auto;
+    }
+    
+    #enhanced_status_bar .spacer {
+        width: 1fr;
+    }
     """
 
     BINDINGS = [
@@ -125,6 +145,7 @@ class SentryTUIApp(App):
     filter_text = reactive("")
     paused = reactive(False)
     line_count = reactive(0)
+    filtered_line_count = reactive(0)
     current_command = reactive("")
     previous_command = reactive("")
     process_state = reactive(ProcessState.STOPPED)
@@ -140,6 +161,11 @@ class SentryTUIApp(App):
         self.discovered_services: set = set()
         self.auto_restart = auto_restart
         self.auto_restart_enabled = auto_restart
+        
+        # Performance tracking
+        self.last_log_time = time.time()
+        self.log_timestamps = []
+        self.update_enhanced_status_timer = None
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
@@ -149,6 +175,7 @@ class SentryTUIApp(App):
             ServiceToggleBar(services=[], id="service_toggle_bar"),
             ProcessStatusBar(id="process_status_bar"),
             RichLog(id="log_display", auto_scroll=True),
+            EnhancedStatusBar(id="enhanced_status_bar"),
             id="main_container",
         )
         yield Footer()
@@ -173,6 +200,12 @@ class SentryTUIApp(App):
 
         # Update initial process status
         self.update_process_status()
+        
+        # Update initial enhanced status bar
+        self.update_enhanced_status_bar()
+        
+        # Set up periodic enhanced status bar updates
+        self.update_enhanced_status_timer = self.set_interval(1.0, self.update_enhanced_status_bar)
 
     def on_process_state_changed(self, new_state: ProcessState) -> None:
         """Handle process state changes."""
@@ -198,11 +231,46 @@ class SentryTUIApp(App):
             # Force a refresh of the display
             self.refresh()
 
+    def update_enhanced_status_bar(self) -> None:
+        """Update the enhanced status bar with current metrics."""
+        try:
+            enhanced_status_bar = self.query_one("#enhanced_status_bar", EnhancedStatusBar)
+            
+            # Calculate filtered line count
+            filtered_count = 0
+            for log_line in self.log_lines:
+                if self.matches_filter(log_line):
+                    filtered_count += 1
+            self.filtered_line_count = filtered_count
+            
+            # Calculate logs per second (using last 10 seconds)
+            current_time = time.time()
+            # Remove timestamps older than 10 seconds
+            self.log_timestamps = [ts for ts in self.log_timestamps if current_time - ts <= 10]
+            logs_per_sec = len(self.log_timestamps) / min(10, max(1, current_time - self.last_log_time))
+            
+            # Get basic memory usage estimate (number of lines * rough estimate per line)
+            memory_usage = len(self.log_lines) * 0.001  # Rough estimate: 1KB per line
+            
+            enhanced_status_bar.update_status(
+                total_lines=self.line_count,
+                filtered_lines=self.filtered_line_count,
+                active_filter=self.filter_text,
+                service_count=len(self.discovered_services),
+                logs_per_sec=logs_per_sec,
+                memory_usage=int(memory_usage),
+            )
+        except Exception:
+            # If enhanced status bar is not available, skip silently
+            pass
+
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
         if event.input.id == "filter_input":
             self.filter_text = event.value
             self.update_log_display()
+            # Update enhanced status bar when filter changes
+            self.update_enhanced_status_bar()
 
     def on_service_toggle_bar_service_toggled(
         self, event: ServiceToggleBar.ServiceToggled
@@ -210,6 +278,8 @@ class SentryTUIApp(App):
         """Handle service toggle events."""
         # Update the log display when service toggles change
         self.update_log_display()
+        # Update enhanced status bar when service toggles change
+        self.update_enhanced_status_bar()
 
     def handle_log_output(self, line: str) -> None:
         """Handle new log output from the intercepted process."""
@@ -217,6 +287,11 @@ class SentryTUIApp(App):
             log_line = LogLine(line)
             self.log_lines.append(log_line)
             self.line_count = len(self.log_lines)
+            
+            # Track timestamp for performance metrics
+            current_time = time.time()
+            self.log_timestamps.append(current_time)
+            self.last_log_time = current_time
 
             # Discover new services dynamically
             if log_line.service not in self.discovered_services:
@@ -368,3 +443,7 @@ class SentryTUIApp(App):
         """Clean up when the app unmounts."""
         if self.interceptor:
             self.interceptor.stop()
+        
+        # Clean up the enhanced status bar timer
+        if self.update_enhanced_status_timer:
+            self.update_enhanced_status_timer.stop()
