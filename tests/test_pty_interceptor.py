@@ -882,6 +882,8 @@ class TestProcessManagement:
             "max_restart_attempts": 5,
             "pid": 12345,
             "command": "test command with args",
+            "ports": [],
+            "process_info": {},
         }
 
         assert status == expected_status

@@ -21,7 +21,11 @@ Sentry TUI provides an interactive terminal interface for viewing and filtering 
   - Shows previous command after editing for reference
   - Restart functionality uses the new command
   - Auto-restart uses the new command if process crashes
-- **Process Status Bar**: Real-time display of process state, PID, restart count, and auto-restart status
+- **Enhanced Process Status Bar**: Real-time display of process information including:
+  - Process state, PID, and auto-restart status
+  - **Open ports** detected using `netstat`/`lsof`/`psutil`
+  - **Memory usage** and **CPU percentage** (when `psutil` is available)
+  - Restart count and command (truncated if long)
 - **Service Recognition**: Automatically identifies and color-codes different services (server, worker, webpack, etc.)
 - **Rich Text Display**: Clean, colorized output using Rich library
 - **Keyboard Navigation**: Focus between filter input and log display
@@ -40,6 +44,7 @@ See [docs/implementation-status.md](docs/implementation-status.md) for detailed 
 - Python 3.11+
 - [uv](https://github.com/astral-sh/uv) package manager
 - Access to Sentry development server
+- `psutil` library (automatically installed) for enhanced process monitoring
 
 ### Method 1: Tool Installation (Recommended)
 
@@ -178,6 +183,14 @@ The TUI provides complete control over the devserver process lifecycle:
 - **STOPPING** - Process is being stopped
 - **RESTARTING** - Process is restarting
 - **CRASHED** - Process has crashed
+
+**Enhanced Status Information:**
+- **Open Ports**: Shows all ports the process is listening on (e.g., "Ports: 8000,8080")
+  - **Smart Detection**: Uses synchronized detection when process is ready
+  - **Preservation**: Maintains port information during restart cycles
+- **Memory Usage**: Real-time memory consumption in MB (e.g., "Memory: 245.2MB")
+- **CPU Usage**: Current CPU percentage (e.g., "CPU: 12.5%")
+- **Process Details**: PID, restart count, and current command
 
 **Process Control:**
 - **Graceful Shutdown** (`s`): Sends SIGTERM to allow clean shutdown

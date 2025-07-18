@@ -244,6 +244,8 @@ class ProcessStatusBar(Horizontal):
         restart_count: int = 0,
         pid: Optional[int] = None,
         command: str = "",
+        ports: Optional[List[int]] = None,
+        process_info: Optional[dict] = None,
     ):
         """Update the process status display."""
         self.process_state = state
@@ -251,6 +253,8 @@ class ProcessStatusBar(Horizontal):
         self.restart_count = restart_count
         self.pid = pid
         self.command = command
+        self.ports = ports or []
+        self.process_info = process_info or {}
 
         # Update state display
         state_display = self.query_one("#process_state_display")
@@ -277,12 +281,27 @@ class ProcessStatusBar(Horizontal):
         # Update process info display
         process_info_display = self.query_one("#process_info_display")
         info_parts = []
+        
         if pid:
             info_parts.append(f"PID: {pid}")
+        
+        if self.ports:
+            ports_str = ",".join(map(str, self.ports))
+            info_parts.append(f"Ports: {ports_str}")
+        
+        if self.process_info.get('memory_mb'):
+            info_parts.append(f"Memory: {self.process_info['memory_mb']}MB")
+            
+        if self.process_info.get('cpu_percent') is not None:
+            info_parts.append(f"CPU: {self.process_info['cpu_percent']}%")
+            
         if restart_count > 0:
             info_parts.append(f"Restarts: {restart_count}")
+            
         if command:
-            info_parts.append(f"Command: {command}")
+            # Truncate command if too long to preserve space for other info
+            display_command = command if len(command) <= 40 else command[:37] + "..."
+            info_parts.append(f"Command: {display_command}")
 
         process_info_display.update(" | ".join(info_parts))
 
@@ -502,10 +521,209 @@ class PTYInterceptor:
         self.state_callbacks = []  # List of callbacks to notify on state changes
         self._state_lock = threading.Lock()  # Lock for thread-safe state management
         self._stop_event = threading.Event()  # Event to signal manual stop operations
+        self.detected_ports = set()  # Track detected ports from logs
+        self.process_info = {}  # Additional process information
+        self.last_known_ports = set()  # Preserve ports from previous process during restart
+        self._process_ready_event = threading.Event()  # Signal when process is ready for port detection
 
     def _default_output_handler(self, line: str):
         """Default output handler that prints to stdout."""
         print(line, end="")
+
+    def _detect_ports_from_process(self):
+        """Detect ports opened by the current process using system tools."""
+        if not self.process:
+            return
+            
+        try:
+            pid = self.process.pid
+            ports = set()
+            
+            # Try different methods to get port information
+            try:
+                # Method 1: Use psutil if available (most reliable)
+                import psutil
+                proc = psutil.Process(pid)
+                connections = proc.connections(kind='inet')
+                for conn in connections:
+                    if conn.status == psutil.CONN_LISTEN and conn.laddr:
+                        ports.add(conn.laddr.port)
+                        
+            except ImportError:
+                # Method 2: Use netstat as fallback
+                try:
+                    import subprocess
+                    # Use netstat to find listening ports for this PID
+                    result = subprocess.run(
+                        ['netstat', '-tulpn'], 
+                        capture_output=True, 
+                        text=True, 
+                        timeout=2
+                    )
+                    
+                    for line in result.stdout.split('\n'):
+                        if f'{pid}/' in line and 'LISTEN' in line:
+                            # Parse netstat output: tcp 0 0 127.0.0.1:8000 0.0.0.0:* LISTEN 12345/python
+                            parts = line.split()
+                            if len(parts) >= 4:
+                                addr = parts[3]  # 127.0.0.1:8000
+                                if ':' in addr:
+                                    port_str = addr.split(':')[-1]
+                                    try:
+                                        port = int(port_str)
+                                        if 1000 <= port <= 65535:
+                                            ports.add(port)
+                                    except ValueError:
+                                        pass
+                                        
+                except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                    # Method 3: Use lsof as another fallback (macOS/Linux)
+                    try:
+                        result = subprocess.run(
+                            ['lsof', '-Pan', '-p', str(pid), '-i'], 
+                            capture_output=True, 
+                            text=True, 
+                            timeout=2
+                        )
+                        
+                        for line in result.stdout.split('\n'):
+                            if 'LISTEN' in line:
+                                # Parse lsof output: python 12345 user 5u IPv4 TCP *:8000 (LISTEN)
+                                parts = line.split()
+                                for part in parts:
+                                    if ':' in part and part.endswith('(LISTEN)'):
+                                        port_str = part.split(':')[-1].replace('(LISTEN)', '')
+                                        try:
+                                            port = int(port_str)
+                                            if 1000 <= port <= 65535:
+                                                ports.add(port)
+                                        except ValueError:
+                                            pass
+                                            
+                    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, FileNotFoundError):
+                        pass
+            
+            # Update detected ports
+            if ports:  # Only update if we actually found ports
+                self.detected_ports = ports
+                self.last_known_ports = ports.copy()  # Preserve for restart scenarios
+            elif not self.detected_ports and self.last_known_ports:
+                # If no ports detected but we have previous knowledge, keep the old ports temporarily
+                # This helps during restart cycles where the process might not be fully ready
+                self.detected_ports = self.last_known_ports.copy()
+            
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError):
+            # Process doesn't exist or no permission
+            self.detected_ports.clear()
+
+    def _wait_for_process_ready_and_update_info(self):
+        """Wait for process to be ready and then update process information."""
+        if not self.process:
+            return
+            
+        # Wait for process ready signal with timeout
+        if self._process_ready_event.wait(timeout=5.0):
+            # Process is ready, proceed with port detection
+            self._detect_ports_from_process()
+        else:
+            # Timeout - try anyway but preserve previous port info if available
+            if self.last_known_ports and not self.detected_ports:
+                self.detected_ports = self.last_known_ports.copy()
+            self._detect_ports_from_process()
+            
+        self._update_basic_process_info()
+
+    def _update_process_info(self):
+        """Update additional process information if available."""
+        if not self.process:
+            return
+            
+        # For regular updates (not startup), just update immediately
+        self._detect_ports_from_process()
+        self._update_basic_process_info()
+            
+    def _update_basic_process_info(self):
+        """Update basic process information like memory and CPU."""
+        if not self.process:
+            return
+            
+        try:
+            # Try to get process info using psutil if available
+            import psutil
+            
+            proc = psutil.Process(self.process.pid)
+            
+            # Get memory info immediately (this is fast and doesn't block)
+            memory_info = proc.memory_info()
+            
+            # Get CPU percent with non-blocking call (interval=None means non-blocking)
+            # First call returns 0.0, subsequent calls return meaningful values
+            cpu_percent = proc.cpu_percent(interval=None)
+            
+            self.process_info = {
+                'memory_mb': round(memory_info.rss / 1024 / 1024, 1),
+                'cpu_percent': round(cpu_percent, 1) if cpu_percent > 0 else None,  # Don't show 0% initially
+                'status': proc.status(),
+                'create_time': proc.create_time(),
+            }
+        except ImportError:
+            # psutil not available, use basic info
+            self.process_info = {
+                'status': 'running' if self.process.poll() is None else 'terminated'
+            }
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # Process doesn't exist or no permission
+            self.process_info = {}
+
+    def _check_process_ready_indicators(self, line: str):
+        """Check if log line indicates the process is ready for port detection."""
+        if self._process_ready_event.is_set():
+            return  # Already signaled
+            
+        clean_line = strip_ansi_codes(line).lower()
+        
+        # Common patterns that indicate a server/process is ready
+        ready_patterns = [
+            'running on',           # "Running on http://127.0.0.1:8000"
+            'listening on',         # "Listening on port 8000"
+            'server started',       # "Server started on port 8000"
+            'development server',   # Django "Development server is running"
+            'starting development', # "Starting development server"
+            'webpack compiled',     # Webpack ready
+            'compiled successfully', # Build completed
+            'ready in',            # Various "Ready in XXXms" messages
+            'listening at',        # "Listening at http://..."
+            'bound to',            # Process bound to address
+            'started server',      # "Started server on"
+            'devserver.*ready',    # Sentry specific
+        ]
+        
+        for pattern in ready_patterns:
+            if re.search(pattern, clean_line):
+                # Signal that the process appears ready
+                self._process_ready_event.set()
+                # Start a thread to update process info now that it's ready
+                threading.Thread(
+                    target=self._wait_for_process_ready_and_update_info,
+                    daemon=True
+                ).start()
+                # Trigger status callbacks to update UI immediately
+                self._notify_status_change()
+                break
+
+    def _notify_status_change(self):
+        """Notify all callbacks that status may have changed."""
+        callbacks = []
+        with self._state_lock:
+            callbacks = self.state_callbacks.copy()
+        
+        # Notify callbacks outside the lock to prevent deadlocks
+        for callback in callbacks:
+            try:
+                callback(self.state)
+            except Exception:
+                # Ignore callback errors to prevent affecting other callbacks
+                pass
 
     def add_state_callback(self, callback: Callable[[ProcessState], None]):
         """Add a callback to be notified when process state changes (thread-safe)."""
@@ -545,6 +763,9 @@ class PTYInterceptor:
 
         # Clear the stop event for new start
         self._stop_event.clear()
+        
+        # Clear the process ready event for new start
+        self._process_ready_event.clear()
 
         try:
             # Create a pseudo-terminal
@@ -616,6 +837,8 @@ class PTYInterceptor:
 
         # Process complete lines
         for line in lines[:-1]:
+            # Check if this line indicates the process is ready
+            self._check_process_ready_indicators(line)
             self.on_output(line + "\n")
 
     def _monitor_process(self):
@@ -726,6 +949,12 @@ class PTYInterceptor:
         # Clean up process reference
         self.process = None
 
+        # Clear process information when stopping (memory, CPU, etc.)
+        self.process_info.clear()
+        self.detected_ports.clear()
+        # Note: Keep last_known_ports for restart scenarios
+        self._process_ready_event.clear()
+
         # Set final state
         self._set_state(ProcessState.STOPPED)
 
@@ -751,7 +980,11 @@ class PTYInterceptor:
                 pass
 
         if self.state == ProcessState.RUNNING:
+            # Preserve port information during restart
+            preserved_ports = self.detected_ports.copy()
             self.stop(force=force)
+            # Restore preserved ports for restart scenario
+            self.last_known_ports = preserved_ports
             # Wait for process to stop with timeout
             timeout = 0
             while (
@@ -776,6 +1009,23 @@ class PTYInterceptor:
     def get_status(self):
         """Get current process status information (thread-safe)."""
         with self._state_lock:
+            # Update process info if we have a running process
+            if self.process and self.state == ProcessState.RUNNING:
+                # Always update basic process info (memory is fast and doesn't need to wait)
+                self._update_basic_process_info()
+                
+                # Handle port detection based on readiness
+                if not self._process_ready_event.is_set():
+                    # Use preserved port info if available, otherwise try immediate detection
+                    if self.last_known_ports and not self.detected_ports:
+                        self.detected_ports = self.last_known_ports.copy()
+                    else:
+                        # Try immediate port detection (may be empty initially)
+                        self._detect_ports_from_process()
+                else:
+                    # Process is ready, update ports normally
+                    self._detect_ports_from_process()
+            
             return {
                 "state": self.state,
                 "auto_restart": self.auto_restart,
@@ -783,6 +1033,8 @@ class PTYInterceptor:
                 "max_restart_attempts": self.max_restart_attempts,
                 "pid": self.process.pid if self.process else None,
                 "command": " ".join(self.command),
+                "ports": sorted(list(self.detected_ports)),
+                "process_info": self.process_info.copy(),
             }
 
 
@@ -930,6 +1182,8 @@ class SentryTUIApp(App):
                 restart_count=status["restart_count"],
                 pid=status["pid"],
                 command=status["command"],
+                ports=status.get("ports", []),
+                process_info=status.get("process_info", {}),
             )
             self.auto_restart_enabled = status["auto_restart"]
             # Force a refresh of the display

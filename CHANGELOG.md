@@ -8,11 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Enhanced Process Status Bar**: Advanced process monitoring with multiple detection methods
+  - **Port Detection**: Shows open ports using `psutil`, `netstat`, or `lsof` for cross-platform compatibility
+  - **Resource Monitoring**: Real-time memory usage (MB) and CPU percentage display
+  - **Smart Fallbacks**: Multiple detection methods ensure compatibility across different systems
+  - **Synchronized Port Detection**: Uses threading events to detect when process is ready for accurate port detection
+  - **Port Preservation**: Maintains port information during restart cycles to prevent information loss
+  - **Intelligent Ready Detection**: Monitors log output for server startup indicators (e.g., "Running on", "Listening on")
+  - **Compact Display**: Efficient layout showing PID, ports, memory, CPU, restart count, and command
 - **Command Editing**: Edit the command while the app is running (press `e` key)
   - Modal dialog for editing the command with current and previous command display
   - Updated command is used by restart and auto-restart functionality
   - Shows previous command after editing for reference
   - Keyboard shortcut: `e` key to open edit dialog
+- **Enhanced Dependencies**: Added `psutil>=5.9.0` for robust cross-platform process monitoring
 - **CLI Tool Installation**: Support for `uv tool install .` to install sentry-tui as a global command-line tool
 - **Command-line Interface**: Proper CLI with argument parsing, help text, and version information
   - `--auto-restart` flag for automatic process restart on crashes
