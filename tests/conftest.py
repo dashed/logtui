@@ -2,7 +2,7 @@
 
 import pytest
 from typing import List
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, patch
 from sentry_tui.pty_interceptor import LogLine, PTYInterceptor
 
 
@@ -16,8 +16,8 @@ def sample_log_lines() -> List[str]:
         "     webpack  14:32:01 Compiled successfully in 1234ms",
         "  taskworker  14:32:01 Processing event id=abc123...",
         "      server  14:32:01 Traceback (most recent call last):",
-        "      server  14:32:01   File \"/app/sentry/api/endpoints/project_events.py\", line 123, in get",
-        "      server  14:32:01     raise ValueError(\"Invalid project ID\")",
+        '      server  14:32:01   File "/app/sentry/api/endpoints/project_events.py", line 123, in get',
+        '      server  14:32:01     raise ValueError("Invalid project ID")',
         "      server  14:32:01 ValueError: Invalid project ID",
     ]
 
@@ -62,11 +62,12 @@ def mock_pty_openpty():
 @pytest.fixture
 def mock_os_functions():
     """Mock os functions for testing."""
-    with patch("os.close") as mock_close, \
-         patch("os.read") as mock_read, \
-         patch("os.killpg") as mock_killpg, \
-         patch("os.getpgid") as mock_getpgid:
-        
+    with (
+        patch("os.close") as mock_close,
+        patch("os.read") as mock_read,
+        patch("os.killpg") as mock_killpg,
+        patch("os.getpgid") as mock_getpgid,
+    ):
         mock_getpgid.return_value = 12345
         yield {
             "close": mock_close,

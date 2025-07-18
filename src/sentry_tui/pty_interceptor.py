@@ -26,24 +26,24 @@ from textual.binding import Binding
 # License: MIT by Sindre Sorhus <sindresorhus@gmail.com>
 # Matches all ansi escape code sequences in a string
 ANSI_ESCAPE_REGEX = re.compile(
-    r'[\u001B\u009B][\[\]()#;?]*'
-    r'(?:(?:(?:(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*'
-    r'|[a-zA-Z\d]+(?:;[-a-zA-Z\d\/#&.:=?%@~_]*)*)?' 
-    r'(?:\u0007|\u001B\u005C|\u009C))'
-    r'|(?:(?:\d{1,4}(?:;\d{0,4})*)?'
-    r'[\dA-PR-TZcf-nq-uy=><~]))'
+    r"[\u001B\u009B][\[\]()#;?]*"
+    r"(?:(?:(?:(?:;[-a-zA-Z\d\/#&.:=?%@~_]+)*"
+    r"|[a-zA-Z\d]+(?:;[-a-zA-Z\d\/#&.:=?%@~_]*)*)?"
+    r"(?:\u0007|\u001B\u005C|\u009C))"
+    r"|(?:(?:\d{1,4}(?:;\d{0,4})*)?"
+    r"[\dA-PR-TZcf-nq-uy=><~]))"
 )
 
 
 def strip_ansi_codes(text: str) -> str:
     """Remove all VT control characters. Use to estimate displayed string width."""
-    return ANSI_ESCAPE_REGEX.sub('', text)
+    return ANSI_ESCAPE_REGEX.sub("", text)
 
 
 # Sentry service colors from src/sentry/runner/formatting.py:18-24
 SENTRY_SERVICE_COLORS = {
     "server": (108, 95, 199),
-    "worker": (255, 194, 39), 
+    "worker": (255, 194, 39),
     "webpack": (61, 116, 219),
     "cron": (255, 86, 124),
     "relay": (250, 71, 71),
@@ -67,66 +67,70 @@ class LogLine:
 
     def _extract_service(self) -> str:
         """Extract service name from Sentry SentryPrinter format.
-        
+
         Format: {colored_service_name} {colored_indicator} HH:MM:SS [LEVEL] module.name: message
-        
+
         The service name appears at the beginning with ANSI color codes.
         We need to strip ANSI codes and extract the service name.
         """
         # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
-        
+
         # Look for service name at the beginning, followed by space and timestamp
         # Pattern: "service_name HH:MM:SS [LEVEL] module.name: message"
-        match = re.match(r'^\s*([a-zA-Z0-9_-]+)\s+\d{2}:\d{2}:\d{2}\s+\[', clean_content)
+        match = re.match(
+            r"^\s*([a-zA-Z0-9_-]+)\s+\d{2}:\d{2}:\d{2}\s+\[", clean_content
+        )
         if match:
             return match.group(1).strip()
-        
+
         # Fallback: try to find service name in known services
         for service in SENTRY_SERVICE_COLORS.keys():
             if service in clean_content:
                 return service
-                
+
         return "unknown"
-    
+
     def _extract_level(self) -> str:
         """Extract log level from HumanRenderer format: HH:MM:SS [LEVEL] module.name: message"""
         # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
-        
+
         # Look for [LEVEL] pattern
-        match = re.search(r'\[(DEBUG|INFO|WARNING|ERROR|CRITICAL|FATAL)\]', clean_content)
+        match = re.search(
+            r"\[(DEBUG|INFO|WARNING|ERROR|CRITICAL|FATAL)\]", clean_content
+        )
         if match:
             return match.group(1)
-            
+
         return "INFO"  # Default level
-    
+
     def _extract_module_name(self) -> str:
         """Extract module name from HumanRenderer format: HH:MM:SS [LEVEL] module.name: message"""
         # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
-        
+
         # Look for pattern after [LEVEL]: module.name: message
-        match = re.search(r'\[\w+\]\s+([^:]+):', clean_content)
+        match = re.search(r"\[\w+\]\s+([^:]+):", clean_content)
         if match:
             return match.group(1).strip()
-            
+
         return "root"  # Default module name
-    
+
     def _extract_message(self) -> str:
         """Extract the actual log message from HumanRenderer format"""
-        # Remove ANSI color codes first 
+        # Remove ANSI color codes first
         clean_content = strip_ansi_codes(self.content)
-        
+
         # Look for message after module.name:
-        match = re.search(r'\[\w+\]\s+[^:]+:\s*(.*)$', clean_content)
+        match = re.search(r"\[\w+\]\s+[^:]+:\s*(.*)$", clean_content)
         if match:
             return match.group(1).strip()
-            
+
         # Fallback: return content after first colon if any
-        if ':' in clean_content:
-            return clean_content.split(':', 1)[1].strip()
-            
+        if ":" in clean_content:
+            return clean_content.split(":", 1)[1].strip()
+
         return clean_content.strip()
 
 

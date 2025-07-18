@@ -1,6 +1,5 @@
 """Tests for LogLine class."""
 
-import pytest
 import time
 from sentry_tui.pty_interceptor import LogLine
 
@@ -12,7 +11,7 @@ class TestLogLine:
         """Test LogLine creation with content."""
         content = "\x1b[38;2;108;95;199m      server\x1b[0m \x1b[38;2;108;95;199m \x1b[0m 14:32:01 [INFO] sentry.web.frontend: GET 200 /api/0/projects/"
         log_line = LogLine(content)
-        
+
         assert log_line.content == content
         assert isinstance(log_line.timestamp, float)
         assert log_line.timestamp > 0
@@ -22,7 +21,7 @@ class TestLogLine:
         content = "Test log line"
         custom_timestamp = 1234567890.0
         log_line = LogLine(content, timestamp=custom_timestamp)
-        
+
         assert log_line.content == content
         assert log_line.timestamp == custom_timestamp
 
@@ -32,7 +31,7 @@ class TestLogLine:
         before_creation = time.time()
         log_line = LogLine(content, timestamp=None)
         after_creation = time.time()
-        
+
         assert log_line.content == content
         assert before_creation <= log_line.timestamp <= after_creation
 
@@ -119,15 +118,15 @@ class TestLogLine:
         """Test that LogLine objects have all expected properties."""
         content = "\x1b[38;2;108;95;199m      server\x1b[0m \x1b[38;2;108;95;199m \x1b[0m 14:32:01 [INFO] sentry.web.frontend: GET 200 /api/0/projects/"
         log_line = LogLine(content)
-        
+
         # Should be able to access all properties
-        assert hasattr(log_line, 'content')
-        assert hasattr(log_line, 'timestamp')
-        assert hasattr(log_line, 'service')
-        assert hasattr(log_line, 'level')
-        assert hasattr(log_line, 'module_name')
-        assert hasattr(log_line, 'message')
-        
+        assert hasattr(log_line, "content")
+        assert hasattr(log_line, "timestamp")
+        assert hasattr(log_line, "service")
+        assert hasattr(log_line, "level")
+        assert hasattr(log_line, "module_name")
+        assert hasattr(log_line, "message")
+
         # Content should be preserved exactly
         assert log_line.content == content
         # Parsed properties should be correct
