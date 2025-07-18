@@ -13,6 +13,7 @@ import subprocess
 import sys
 import threading
 import time
+from enum import Enum
 from typing import Callable, List, Optional
 
 from rich.text import Text
@@ -35,6 +36,17 @@ ANSI_ESCAPE_REGEX = re.compile(
     r"|(?:(?:\d{1,4}(?:;\d{0,4})*)?"
     r"[\dA-PR-TZcf-nq-uy=><~]))"
 )
+
+
+class ProcessState(Enum):
+    """Process state constants for PTY interceptor."""
+
+    STOPPED = "stopped"
+    STARTING = "starting"
+    RUNNING = "running"
+    STOPPING = "stopping"
+    RESTARTING = "restarting"
+    CRASHED = "crashed"
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -204,6 +216,76 @@ class ServiceToggleBar(Horizontal):
         return service in self.enabled_services
 
 
+class ProcessStatusBar(Horizontal):
+    """A horizontal bar showing process status and controls."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.process_state = ProcessState.STOPPED
+        self.auto_restart = False
+        self.restart_count = 0
+        self.pid = None
+        self.command = ""
+
+    def compose(self) -> ComposeResult:
+        """Compose the process status display."""
+        from textual.widgets import Static
+
+        yield Static("Process: ", id="process_label")
+        yield Static("STOPPED", id="process_state_display")
+        yield Static("Auto-restart: OFF", id="auto_restart_display")
+        yield Static("", id="process_info_display")
+
+    def update_status(
+        self,
+        state: ProcessState,
+        auto_restart: bool,
+        restart_count: int = 0,
+        pid: Optional[int] = None,
+        command: str = "",
+    ):
+        """Update the process status display."""
+        self.process_state = state
+        self.auto_restart = auto_restart
+        self.restart_count = restart_count
+        self.pid = pid
+        self.command = command
+
+        # Update state display
+        state_display = self.query_one("#process_state_display")
+        state_colors = {
+            ProcessState.STOPPED: "dim",
+            ProcessState.STARTING: "yellow",
+            ProcessState.RUNNING: "green",
+            ProcessState.STOPPING: "yellow",
+            ProcessState.RESTARTING: "blue",
+            ProcessState.CRASHED: "red",
+        }
+        state_display.update(
+            f"[{state_colors.get(state, 'white')}]{state.value.upper()}[/]"
+        )
+
+        # Update auto-restart display
+        auto_restart_display = self.query_one("#auto_restart_display")
+        auto_restart_text = "ON" if auto_restart else "OFF"
+        auto_restart_color = "green" if auto_restart else "dim"
+        auto_restart_display.update(
+            f"Auto-restart: [{auto_restart_color}]{auto_restart_text}[/]"
+        )
+
+        # Update process info display
+        process_info_display = self.query_one("#process_info_display")
+        info_parts = []
+        if pid:
+            info_parts.append(f"PID: {pid}")
+        if restart_count > 0:
+            info_parts.append(f"Restarts: {restart_count}")
+        if command:
+            info_parts.append(f"Command: {command}")
+
+        process_info_display.update(" | ".join(info_parts))
+
+
 class LogLine:
     """Represents a single log line with metadata."""
 
@@ -288,7 +370,10 @@ class PTYInterceptor:
     """PTY-based process interceptor that captures output while preserving terminal behavior."""
 
     def __init__(
-        self, command: List[str], on_output: Optional[Callable[[str], None]] = None
+        self,
+        command: List[str],
+        on_output: Optional[Callable[[str], None]] = None,
+        auto_restart: bool = False,
     ):
         self.command = command
         self.on_output = on_output or self._default_output_handler
@@ -297,40 +382,98 @@ class PTYInterceptor:
         self.slave_fd = None
         self.running = False
         self.output_thread = None
+        self.monitor_thread = None
         self.buffer = ""
+        self.state = ProcessState.STOPPED
+        self.auto_restart = auto_restart
+        self.restart_count = 0
+        self.max_restart_attempts = 5
+        self.restart_delay = 1.0  # seconds
+        self.state_callbacks = []  # List of callbacks to notify on state changes
+        self._state_lock = threading.Lock()  # Lock for thread-safe state management
+        self._stop_event = threading.Event()  # Event to signal manual stop operations
 
     def _default_output_handler(self, line: str):
         """Default output handler that prints to stdout."""
         print(line, end="")
 
+    def add_state_callback(self, callback: Callable[[ProcessState], None]):
+        """Add a callback to be notified when process state changes (thread-safe)."""
+        with self._state_lock:
+            self.state_callbacks.append(callback)
+
+    def remove_state_callback(self, callback: Callable[[ProcessState], None]):
+        """Remove a state change callback (thread-safe)."""
+        with self._state_lock:
+            if callback in self.state_callbacks:
+                self.state_callbacks.remove(callback)
+
+    def _set_state(self, new_state: ProcessState):
+        """Set the process state and notify callbacks (thread-safe)."""
+        callbacks = []
+        with self._state_lock:
+            if self.state != new_state:
+                self.state = new_state
+                # Notify callbacks outside the lock to prevent deadlocks
+                callbacks = self.state_callbacks.copy()
+
+        # Call callbacks outside the lock (only if state changed)
+        for callback in callbacks:
+            try:
+                callback(new_state)
+            except Exception:
+                # Ignore callback errors to prevent cascading failures
+                pass
+
     def start(self):
         """Start the PTY-based interception."""
-        # Create a pseudo-terminal
-        self.master_fd, self.slave_fd = pty.openpty()
+        with self._state_lock:
+            if self.state == ProcessState.RUNNING:
+                return  # Already running
 
-        # Start the subprocess with PTY
-        self.process = subprocess.Popen(
-            self.command,
-            stdin=self.slave_fd,
-            stdout=self.slave_fd,
-            stderr=self.slave_fd,
-            start_new_session=True,
-        )
+        self._set_state(ProcessState.STARTING)
 
-        # Close the slave fd in the parent process
-        os.close(self.slave_fd)
+        # Clear the stop event for new start
+        self._stop_event.clear()
 
-        # Set up non-blocking I/O
-        import fcntl
+        try:
+            # Create a pseudo-terminal
+            self.master_fd, self.slave_fd = pty.openpty()
 
-        flags = fcntl.fcntl(self.master_fd, fcntl.F_GETFL)
-        fcntl.fcntl(self.master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            # Start the subprocess with PTY
+            self.process = subprocess.Popen(
+                self.command,
+                stdin=self.slave_fd,
+                stdout=self.slave_fd,
+                stderr=self.slave_fd,
+                start_new_session=True,
+            )
 
-        self.running = True
+            # Close the slave fd in the parent process
+            os.close(self.slave_fd)
 
-        # Start output reading thread
-        self.output_thread = threading.Thread(target=self._read_output, daemon=True)
-        self.output_thread.start()
+            # Set up non-blocking I/O
+            import fcntl
+
+            flags = fcntl.fcntl(self.master_fd, fcntl.F_GETFL)
+            fcntl.fcntl(self.master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+            self.running = True
+
+            # Start output reading thread
+            self.output_thread = threading.Thread(target=self._read_output, daemon=True)
+            self.output_thread.start()
+
+            # Start process monitoring thread
+            self.monitor_thread = threading.Thread(
+                target=self._monitor_process, daemon=True
+            )
+            self.monitor_thread.start()
+
+            self._set_state(ProcessState.RUNNING)
+        except Exception:
+            self._set_state(ProcessState.CRASHED)
+            raise
 
     def _read_output(self):
         """Read output from the PTY master in a separate thread."""
@@ -365,24 +508,95 @@ class PTYInterceptor:
         for line in lines[:-1]:
             self.on_output(line + "\n")
 
-    def stop(self):
-        """Stop the PTY interception."""
+    def _monitor_process(self):
+        """Monitor the process and handle auto-restart if enabled."""
+        while self.running and self.process:
+            try:
+                # Check if process is still running
+                exit_code = self.process.poll()
+                if exit_code is not None:
+                    # Process has terminated
+                    self.running = False
+
+                    # Use thread-safe state management
+                    with self._state_lock:
+                        is_manual_stop = self._stop_event.is_set()
+                        current_state = self.state
+
+                    # Only set state if this is not a manual stop operation
+                    if not is_manual_stop and current_state != ProcessState.STOPPING:
+                        if exit_code == 0:
+                            self._set_state(ProcessState.STOPPED)
+                        else:
+                            self._set_state(ProcessState.CRASHED)
+
+                    # Handle auto-restart only if not manually stopping and auto-restart enabled
+                    with self._state_lock:
+                        should_restart = (
+                            self.auto_restart
+                            and not is_manual_stop
+                            and self.state
+                            not in [ProcessState.STOPPING, ProcessState.STOPPED]
+                            and self.restart_count < self.max_restart_attempts
+                        )
+
+                    if should_restart:
+                        self.restart_count += 1
+                        self._set_state(ProcessState.RESTARTING)
+                        time.sleep(self.restart_delay)
+                        try:
+                            # Reset state to stopped before restarting
+                            with self._state_lock:
+                                self.state = ProcessState.STOPPED
+                            self.start()
+                        except Exception:
+                            # Restart failed
+                            self._set_state(ProcessState.CRASHED)
+                    elif self.restart_count >= self.max_restart_attempts:
+                        # Max restart attempts reached
+                        self._set_state(ProcessState.CRASHED)
+
+                    break
+
+                time.sleep(0.1)  # Check every 100ms
+            except Exception:
+                # Error monitoring process
+                break
+
+    def stop(self, force: bool = False):
+        """Stop the PTY interception.
+
+        Args:
+            force: If True, use SIGKILL immediately instead of SIGTERM.
+        """
+        with self._state_lock:
+            if self.state == ProcessState.STOPPED:
+                return  # Already stopped
+
+            # Signal that this is a manual stop operation
+            self._stop_event.set()
+
+        self._set_state(ProcessState.STOPPING)
         self.running = False
 
         if self.process:
             try:
-                # Send SIGTERM to process group
-                os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
+                # Send appropriate signal to process group
+                sig = signal.SIGKILL if force else signal.SIGTERM
+                os.killpg(os.getpgid(self.process.pid), sig)
 
                 # Wait for process to terminate
-                self.process.wait(timeout=5)
+                timeout = 1 if force else 5
+                self.process.wait(timeout=timeout)
             except (subprocess.TimeoutExpired, ProcessLookupError):
-                # Force kill if necessary
-                try:
-                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
+                # Force kill if necessary (only if not already using SIGKILL)
+                if not force:
+                    try:
+                        os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
 
+        # Clean up file descriptors
         if self.master_fd is not None:
             try:
                 os.close(self.master_fd)
@@ -392,8 +606,74 @@ class PTYInterceptor:
             finally:
                 self.master_fd = None
 
+        # Clean up threads
         if self.output_thread and self.output_thread.is_alive():
             self.output_thread.join(timeout=1)
+
+        if self.monitor_thread and self.monitor_thread.is_alive():
+            self.monitor_thread.join(timeout=1)
+
+        # Clean up process reference
+        self.process = None
+
+        # Set final state
+        self._set_state(ProcessState.STOPPED)
+
+    def graceful_shutdown(self):
+        """Gracefully shutdown the process using SIGTERM."""
+        self.auto_restart = False  # Disable auto-restart for graceful shutdown
+        self.stop(force=False)
+
+    def force_quit(self):
+        """Force quit the process using SIGKILL."""
+        self.auto_restart = False  # Disable auto-restart for force quit
+        self.stop(force=True)
+
+    def restart(self, force: bool = False):
+        """Restart the process.
+
+        Args:
+            force: If True, use SIGKILL to stop the process before restarting.
+        """
+        with self._state_lock:
+            if self.state == ProcessState.RUNNING:
+                # Don't use the stop event for restart - we want to restart
+                pass
+
+        if self.state == ProcessState.RUNNING:
+            self.stop(force=force)
+            # Wait for process to stop with timeout
+            timeout = 0
+            while (
+                self.state not in [ProcessState.STOPPED, ProcessState.CRASHED]
+                and timeout < 50
+            ):
+                time.sleep(0.1)
+                timeout += 1
+
+        # Reset restart counter and ensure clean state
+        with self._state_lock:
+            self.restart_count = 0
+            self.state = ProcessState.STOPPED
+
+        self.start()
+
+    def toggle_auto_restart(self):
+        """Toggle auto-restart functionality."""
+        self.auto_restart = not self.auto_restart
+        return self.auto_restart
+
+    def get_status(self):
+        """Get current process status information (thread-safe)."""
+        with self._state_lock:
+            return {
+                "state": self.state,
+                "auto_restart": self.auto_restart,
+                "restart_count": self.restart_count,
+                "max_restart_attempts": self.max_restart_attempts,
+                "pid": self.process.pid if self.process else None,
+                "command": " ".join(self.command),
+            }
 
 
 class SentryTUIApp(App):
@@ -440,6 +720,20 @@ class SentryTUIApp(App):
         padding: 0;
         width: auto;
     }
+    
+    #process_status_bar {
+        height: 1;
+        background: $surface;
+        color: $text;
+        padding: 0 1;
+        margin: 0;
+    }
+    
+    #process_status_bar Static {
+        margin: 0 1;
+        padding: 0;
+        width: auto;
+    }
     """
 
     BINDINGS = [
@@ -449,18 +743,27 @@ class SentryTUIApp(App):
         Binding("l", "focus_log", "Focus Log"),
         Binding("c", "clear_logs", "Clear Logs"),
         Binding("p", "toggle_pause", "Pause/Resume"),
+        Binding("s", "graceful_shutdown", "Graceful Shutdown"),
+        Binding("k", "force_quit", "Force Quit"),
+        Binding("r", "restart", "Restart"),
+        Binding("shift+r", "force_restart", "Force Restart"),
+        Binding("a", "toggle_auto_restart", "Toggle Auto-restart"),
     ]
 
     filter_text = reactive("")
     paused = reactive(False)
     line_count = reactive(0)
+    process_state = reactive(ProcessState.STOPPED)
+    auto_restart_enabled = reactive(False)
 
-    def __init__(self, command: List[str]):
+    def __init__(self, command: List[str], auto_restart: bool = False):
         super().__init__()
         self.command = command
         self.interceptor = None
         self.log_lines: List[LogLine] = []
         self.discovered_services: set = set()
+        self.auto_restart = auto_restart
+        self.auto_restart_enabled = auto_restart
 
     def compose(self) -> ComposeResult:
         """Compose the TUI layout."""
@@ -468,6 +771,7 @@ class SentryTUIApp(App):
         yield Vertical(
             Input(placeholder="Filter logs...", id="filter_input"),
             ServiceToggleBar(services=[], id="service_toggle_bar"),
+            ProcessStatusBar(id="process_status_bar"),
             RichLog(id="log_display", auto_scroll=True),
             id="main_container",
         )
@@ -476,13 +780,45 @@ class SentryTUIApp(App):
     def on_mount(self) -> None:
         """Initialize the interceptor when the app mounts."""
         self.interceptor = PTYInterceptor(
-            command=self.command, on_output=self.handle_log_output
+            command=self.command,
+            on_output=self.handle_log_output,
+            auto_restart=self.auto_restart,
         )
+
+        # Set up process state callback
+        self.interceptor.add_state_callback(self.on_process_state_changed)
+
+        # Start the interceptor
         self.interceptor.start()
 
         # Set up filter input handler
         filter_input = self.query_one("#filter_input", Input)
         filter_input.focus()
+
+        # Update initial process status
+        self.update_process_status()
+
+    def on_process_state_changed(self, new_state: ProcessState) -> None:
+        """Handle process state changes."""
+        self.process_state = new_state
+        # Use a small delay to ensure state is fully updated
+        self.call_from_thread(self.update_process_status)
+
+    def update_process_status(self) -> None:
+        """Update the process status display."""
+        if self.interceptor:
+            status = self.interceptor.get_status()
+            process_status_bar = self.query_one("#process_status_bar", ProcessStatusBar)
+            process_status_bar.update_status(
+                state=status["state"],
+                auto_restart=status["auto_restart"],
+                restart_count=status["restart_count"],
+                pid=status["pid"],
+                command=status["command"],
+            )
+            self.auto_restart_enabled = status["auto_restart"]
+            # Force a refresh of the display
+            self.refresh()
 
     def on_input_changed(self, event: Input.Changed) -> None:
         """Handle filter input changes."""
@@ -566,6 +902,41 @@ class SentryTUIApp(App):
         # Scroll to end
         log_widget.scroll_end()
 
+    def action_graceful_shutdown(self) -> None:
+        """Gracefully shutdown the devserver."""
+        if self.interceptor:
+            self.interceptor.graceful_shutdown()
+            # Force an immediate status update
+            self.update_process_status()
+
+    def action_force_quit(self) -> None:
+        """Force quit the devserver."""
+        if self.interceptor:
+            self.interceptor.force_quit()
+            # Force an immediate status update
+            self.update_process_status()
+
+    def action_restart(self) -> None:
+        """Restart the devserver gracefully."""
+        if self.interceptor:
+            self.interceptor.restart(force=False)
+            # Force an immediate status update
+            self.update_process_status()
+
+    def action_force_restart(self) -> None:
+        """Force restart the devserver."""
+        if self.interceptor:
+            self.interceptor.restart(force=True)
+            # Force an immediate status update
+            self.update_process_status()
+
+    def action_toggle_auto_restart(self) -> None:
+        """Toggle auto-restart functionality."""
+        if self.interceptor:
+            self.interceptor.toggle_auto_restart()
+            # Force an immediate status update
+            self.update_process_status()
+
     def action_focus_filter(self) -> None:
         """Focus the filter input."""
         self.query_one("#filter_input", Input).focus()
@@ -605,10 +976,23 @@ def main():
         print(
             "Example: python -m sentry_tui.pty_interceptor python -m sentry_tui.dummy_app"
         )
+        print("Use --auto-restart to enable automatic restart on crashes")
         sys.exit(1)
 
-    command = sys.argv[1:]
-    app = SentryTUIApp(command)
+    # Parse arguments
+    auto_restart = False
+    command_args = []
+    for arg in sys.argv[1:]:
+        if arg == "--auto-restart":
+            auto_restart = True
+        else:
+            command_args.append(arg)
+
+    if not command_args:
+        print("Error: No command provided")
+        sys.exit(1)
+
+    app = SentryTUIApp(command_args, auto_restart=auto_restart)
     app.run()
 
 

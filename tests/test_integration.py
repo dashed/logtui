@@ -183,16 +183,17 @@ class TestIntegration:
             assert interceptor.process is not None
             assert interceptor.process.poll() is None  # Process should still be running
 
+            # Get process reference before stopping
+            process = interceptor.process
+
             # Stop the interceptor (this should send SIGTERM)
             interceptor.stop()
 
             # Wait a bit for cleanup
             time.sleep(0.5)
 
-            # Verify process is stopped
-            assert (
-                interceptor.process.poll() is not None
-            )  # Process should be terminated
+            # Verify process is stopped (use saved reference since stop() cleans up process)
+            assert process.poll() is not None  # Process should be terminated
 
             # Verify we got some output before termination
             assert len(output_lines) > 0

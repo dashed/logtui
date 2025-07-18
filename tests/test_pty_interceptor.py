@@ -4,6 +4,7 @@ import subprocess
 from unittest.mock import Mock, patch, call
 from sentry_tui.pty_interceptor import (
     PTYInterceptor,
+    ProcessState,
     strip_ansi_background_colors,
     apply_rich_coloring,
 )
@@ -134,9 +135,9 @@ class TestPTYInterceptor:
         # Verify non-blocking I/O setup
         assert mock_fcntl.call_count == 2  # Get and set flags
 
-        # Verify thread is created and started
-        mock_thread.assert_called_once()
-        mock_thread_instance.start.assert_called_once()
+        # Verify threads are created and started (output + monitor threads)
+        assert mock_thread.call_count == 2
+        assert mock_thread_instance.start.call_count == 2
 
         # Verify state
         assert interceptor.running is True
@@ -154,13 +155,19 @@ class TestPTYInterceptor:
 
         # Setup interceptor state
         interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
         interceptor.process = Mock()
         interceptor.process.pid = 12345
         interceptor.master_fd = 10
         interceptor.output_thread = Mock()
         interceptor.output_thread.is_alive.return_value = True
+        interceptor.monitor_thread = Mock()
+        interceptor.monitor_thread.is_alive.return_value = True
 
         mock_getpgid.return_value = 54321
+
+        # Save process reference before stop (since stop() sets process = None)
+        process = interceptor.process
 
         interceptor.stop()
 
@@ -170,7 +177,7 @@ class TestPTYInterceptor:
         # Verify process termination
         mock_getpgid.assert_called_with(12345)
         mock_killpg.assert_called_with(54321, 15)  # SIGTERM
-        interceptor.process.wait.assert_called_once_with(timeout=5)
+        process.wait.assert_called_once_with(timeout=5)
 
         # Verify file descriptor cleanup
         mock_close.assert_called_once_with(10)
@@ -191,12 +198,15 @@ class TestPTYInterceptor:
 
         # Setup interceptor state
         interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
         interceptor.process = Mock()
         interceptor.process.pid = 12345
         interceptor.process.wait.side_effect = subprocess.TimeoutExpired([], 5)
         interceptor.master_fd = 10
         interceptor.output_thread = Mock()
         interceptor.output_thread.is_alive.return_value = True
+        interceptor.monitor_thread = Mock()
+        interceptor.monitor_thread.is_alive.return_value = True
 
         mock_getpgid.return_value = 54321
 
@@ -222,11 +232,14 @@ class TestPTYInterceptor:
 
         # Setup interceptor state
         interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
         interceptor.process = Mock()
         interceptor.process.pid = 12345
         interceptor.master_fd = 10
         interceptor.output_thread = Mock()
         interceptor.output_thread.is_alive.return_value = True
+        interceptor.monitor_thread = Mock()
+        interceptor.monitor_thread.is_alive.return_value = True
 
         mock_getpgid.side_effect = ProcessLookupError("Process not found")
 
@@ -381,15 +394,21 @@ class TestPTYInterceptor:
 
         # Setup interceptor state
         interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
         interceptor.process = Mock()
         interceptor.process.pid = 12345
         interceptor.master_fd = 10
         interceptor.output_thread = Mock()
         interceptor.output_thread.is_alive.return_value = True
+        interceptor.monitor_thread = Mock()
+        interceptor.monitor_thread.is_alive.return_value = True
 
         mock_getpgid.return_value = 54321
         # Mock close to raise OSError (bad file descriptor)
         mock_close.side_effect = OSError("Bad file descriptor")
+
+        # Save process reference before stop (since stop() sets process = None)
+        process = interceptor.process
 
         interceptor.stop()
 
@@ -399,7 +418,7 @@ class TestPTYInterceptor:
         # Verify process termination
         mock_getpgid.assert_called_with(12345)
         mock_killpg.assert_called_with(54321, 15)  # SIGTERM
-        interceptor.process.wait.assert_called_once_with(timeout=5)
+        process.wait.assert_called_once_with(timeout=5)
 
         # Verify file descriptor cleanup was attempted
         mock_close.assert_called_once_with(10)
@@ -420,13 +439,19 @@ class TestPTYInterceptor:
 
         # Setup interceptor state
         interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
         interceptor.process = Mock()
         interceptor.process.pid = 12345
         interceptor.master_fd = None  # No file descriptor
         interceptor.output_thread = Mock()
         interceptor.output_thread.is_alive.return_value = True
+        interceptor.monitor_thread = Mock()
+        interceptor.monitor_thread.is_alive.return_value = True
 
         mock_getpgid.return_value = 54321
+
+        # Save process reference before stop (since stop() sets process = None)
+        process = interceptor.process
 
         interceptor.stop()
 
@@ -436,7 +461,7 @@ class TestPTYInterceptor:
         # Verify process termination
         mock_getpgid.assert_called_with(12345)
         mock_killpg.assert_called_with(54321, 15)  # SIGTERM
-        interceptor.process.wait.assert_called_once_with(timeout=5)
+        process.wait.assert_called_once_with(timeout=5)
 
         # Verify file descriptor cleanup was not attempted
         mock_close.assert_not_called()
@@ -680,3 +705,318 @@ class TestRichColoring:
         result = apply_rich_coloring(content)
         assert isinstance(result, Text)
         assert str(result) == "plain text message"
+
+
+class TestProcessManagement:
+    """Test cases for process management functionality."""
+
+    def test_interceptor_initialization_with_auto_restart(self):
+        """Test PTYInterceptor initialization with auto_restart enabled."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command, auto_restart=True)
+
+        assert interceptor.auto_restart is True
+        assert interceptor.state == ProcessState.STOPPED
+        assert interceptor.restart_count == 0
+        assert interceptor.max_restart_attempts == 5
+        assert interceptor.restart_delay == 1.0
+        assert interceptor.state_callbacks == []
+
+    def test_state_callback_management(self):
+        """Test adding and removing state callbacks."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+
+        callback1 = Mock()
+        callback2 = Mock()
+
+        # Add callbacks
+        interceptor.add_state_callback(callback1)
+        interceptor.add_state_callback(callback2)
+
+        assert len(interceptor.state_callbacks) == 2
+        assert callback1 in interceptor.state_callbacks
+        assert callback2 in interceptor.state_callbacks
+
+        # Remove callback
+        interceptor.remove_state_callback(callback1)
+        assert len(interceptor.state_callbacks) == 1
+        assert callback1 not in interceptor.state_callbacks
+        assert callback2 in interceptor.state_callbacks
+
+    def test_state_change_notification(self):
+        """Test that state changes trigger callbacks."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+
+        callback1 = Mock()
+        callback2 = Mock()
+
+        interceptor.add_state_callback(callback1)
+        interceptor.add_state_callback(callback2)
+
+        # Change state
+        interceptor._set_state(ProcessState.RUNNING)
+
+        # Verify callbacks were called
+        callback1.assert_called_once_with(ProcessState.RUNNING)
+        callback2.assert_called_once_with(ProcessState.RUNNING)
+
+        # Test that same state doesn't trigger callback
+        callback1.reset_mock()
+        callback2.reset_mock()
+
+        interceptor._set_state(ProcessState.RUNNING)
+
+        callback1.assert_not_called()
+        callback2.assert_not_called()
+
+    def test_state_callback_exception_handling(self):
+        """Test that exceptions in callbacks don't crash the interceptor."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+
+        # Add a callback that raises an exception
+        def bad_callback(state):
+            raise ValueError("Test exception")
+
+        good_callback = Mock()
+
+        interceptor.add_state_callback(bad_callback)
+        interceptor.add_state_callback(good_callback)
+
+        # Change state - should not raise exception
+        interceptor._set_state(ProcessState.RUNNING)
+
+        # Good callback should still be called
+        good_callback.assert_called_once_with(ProcessState.RUNNING)
+
+    def test_graceful_shutdown(self):
+        """Test graceful shutdown method."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command, auto_restart=True)
+
+        with patch.object(interceptor, "stop") as mock_stop:
+            interceptor.graceful_shutdown()
+
+            # Should disable auto-restart and call stop with force=False
+            assert interceptor.auto_restart is False
+            mock_stop.assert_called_once_with(force=False)
+
+    def test_force_quit(self):
+        """Test force quit method."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command, auto_restart=True)
+
+        with patch.object(interceptor, "stop") as mock_stop:
+            interceptor.force_quit()
+
+            # Should disable auto-restart and call stop with force=True
+            assert interceptor.auto_restart is False
+            mock_stop.assert_called_once_with(force=True)
+
+    def test_restart_method(self):
+        """Test restart method."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+        interceptor.state = ProcessState.RUNNING
+
+        with patch.object(interceptor, "stop") as mock_stop:
+            with patch.object(interceptor, "start") as mock_start:
+                with patch("time.sleep"):  # Mock sleep for faster tests
+                    interceptor.restart(force=False)
+
+                    # Should call stop with force=False, then start
+                    mock_stop.assert_called_once_with(force=False)
+                    mock_start.assert_called_once()
+                    assert interceptor.restart_count == 0
+
+    def test_restart_method_force(self):
+        """Test restart method with force=True."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+        interceptor.state = ProcessState.RUNNING
+
+        with patch.object(interceptor, "stop") as mock_stop:
+            with patch.object(interceptor, "start") as mock_start:
+                with patch("time.sleep"):  # Mock sleep for faster tests
+                    interceptor.restart(force=True)
+
+                    # Should call stop with force=True, then start
+                    mock_stop.assert_called_once_with(force=True)
+                    mock_start.assert_called_once()
+
+    def test_toggle_auto_restart(self):
+        """Test toggle auto-restart method."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command, auto_restart=False)
+
+        # Initially disabled
+        assert interceptor.auto_restart is False
+
+        # Toggle on
+        result = interceptor.toggle_auto_restart()
+        assert result is True
+        assert interceptor.auto_restart is True
+
+        # Toggle off
+        result = interceptor.toggle_auto_restart()
+        assert result is False
+        assert interceptor.auto_restart is False
+
+    def test_get_status(self):
+        """Test get_status method."""
+        command = ["test", "command", "with", "args"]
+        interceptor = PTYInterceptor(command, auto_restart=True)
+        interceptor.state = ProcessState.RUNNING
+        interceptor.restart_count = 3
+        interceptor.process = Mock()
+        interceptor.process.pid = 12345
+
+        status = interceptor.get_status()
+
+        expected_status = {
+            "state": ProcessState.RUNNING,
+            "auto_restart": True,
+            "restart_count": 3,
+            "max_restart_attempts": 5,
+            "pid": 12345,
+            "command": "test command with args",
+        }
+
+        assert status == expected_status
+
+    def test_get_status_no_process(self):
+        """Test get_status method when no process is running."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+
+        status = interceptor.get_status()
+
+        assert status["state"] == ProcessState.STOPPED
+        assert status["auto_restart"] is False
+        assert status["restart_count"] == 0
+        assert status["pid"] is None
+        assert status["command"] == "test command"
+
+    @patch("time.sleep")
+    def test_monitor_process_normal_termination(self, mock_sleep):
+        """Test process monitoring with normal termination."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+        interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
+        interceptor.process = Mock()
+        interceptor.process.poll.return_value = 0  # Normal exit
+        # Clear stop event to simulate normal operation (not manual stop)
+        interceptor._stop_event.clear()
+
+        state_callback = Mock()
+        interceptor.add_state_callback(state_callback)
+
+        # Run monitor once
+        interceptor._monitor_process()
+
+        # Should set state to STOPPED
+        assert interceptor.running is False
+        state_callback.assert_called_with(ProcessState.STOPPED)
+
+    @patch("time.sleep")
+    def test_monitor_process_crash(self, mock_sleep):
+        """Test process monitoring with crash."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+        interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
+        interceptor.process = Mock()
+        interceptor.process.poll.return_value = 1  # Error exit
+        # Clear stop event to simulate normal operation (not manual stop)
+        interceptor._stop_event.clear()
+
+        state_callback = Mock()
+        interceptor.add_state_callback(state_callback)
+
+        # Run monitor once
+        interceptor._monitor_process()
+
+        # Should set state to CRASHED
+        assert interceptor.running is False
+        state_callback.assert_called_with(ProcessState.CRASHED)
+
+    @patch("time.sleep")
+    def test_monitor_process_auto_restart(self, mock_sleep):
+        """Test process monitoring with auto-restart."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command, auto_restart=True)
+        interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
+        interceptor.process = Mock()
+        interceptor.process.poll.return_value = 1  # Error exit
+        # Clear stop event to simulate normal operation (not manual stop)
+        interceptor._stop_event.clear()
+
+        state_callback = Mock()
+        interceptor.add_state_callback(state_callback)
+
+        with patch.object(interceptor, "start") as mock_start:
+            # Run monitor once
+            interceptor._monitor_process()
+
+            # Should try to restart
+            mock_start.assert_called_once()
+            assert interceptor.restart_count == 1
+
+    @patch("time.sleep")
+    def test_monitor_process_max_restart_attempts(self, mock_sleep):
+        """Test process monitoring with max restart attempts reached."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command, auto_restart=True)
+        interceptor.running = True
+        interceptor.state = ProcessState.RUNNING
+        interceptor.process = Mock()
+        interceptor.process.poll.return_value = 1  # Error exit
+        interceptor.restart_count = 5  # Already at max
+        # Clear stop event to simulate normal operation (not manual stop)
+        interceptor._stop_event.clear()
+
+        state_callback = Mock()
+        interceptor.add_state_callback(state_callback)
+
+        with patch.object(interceptor, "start") as mock_start:
+            # Run monitor once
+            interceptor._monitor_process()
+
+            # Should not try to restart
+            mock_start.assert_not_called()
+            state_callback.assert_called_with(ProcessState.CRASHED)
+
+    def test_stop_with_force_flag(self):
+        """Test stop method with force flag."""
+        command = ["test", "command"]
+        interceptor = PTYInterceptor(command)
+        interceptor.state = ProcessState.RUNNING
+        interceptor.running = True
+        interceptor.process = Mock()
+        interceptor.process.pid = 12345
+        interceptor.master_fd = 10
+        interceptor.output_thread = Mock()
+        interceptor.output_thread.is_alive.return_value = True
+        interceptor.monitor_thread = Mock()
+        interceptor.monitor_thread.is_alive.return_value = True
+
+        with patch("os.killpg") as mock_killpg:
+            with patch("os.getpgid") as mock_getpgid:
+                with patch("os.close") as mock_close:
+                    mock_getpgid.return_value = 54321
+
+                    # Save process reference before stop (since stop() sets process = None)
+                    process = interceptor.process
+
+                    # Test force stop
+                    interceptor.stop(force=True)
+
+                    # Should use SIGKILL immediately
+                    mock_killpg.assert_called_once_with(54321, 9)  # SIGKILL
+                    process.wait.assert_called_once_with(timeout=1)
+                    mock_close.assert_called_once_with(10)
+                    assert interceptor.state == ProcessState.STOPPED

@@ -3,7 +3,13 @@
 import pytest
 from unittest.mock import Mock, patch
 from textual.widgets import Input, RichLog
-from sentry_tui.pty_interceptor import SentryTUIApp, LogLine, ServiceToggleBar
+from sentry_tui.pty_interceptor import (
+    SentryTUIApp,
+    LogLine,
+    ServiceToggleBar,
+    ProcessState,
+    ProcessStatusBar,
+)
 
 
 class TestSentryTUIApp:
@@ -16,6 +22,15 @@ class TestSentryTUIApp:
             "sentry_tui.pty_interceptor.PTYInterceptor"
         ) as mock_interceptor_class:
             mock_interceptor = Mock()
+            # Configure get_status to return a proper dictionary
+            mock_interceptor.get_status.return_value = {
+                "state": ProcessState.STOPPED,
+                "auto_restart": False,
+                "restart_count": 0,
+                "max_restart_attempts": 5,
+                "pid": None,
+                "command": "test command",
+            }
             mock_interceptor_class.return_value = mock_interceptor
             yield mock_interceptor
 
@@ -600,3 +615,353 @@ class TestServiceToggleBar:
 
                 # Verify call_from_thread was called
                 mock_call_from_thread.assert_called()
+
+
+class TestProcessControlActions:
+    """Test cases for process control actions in SentryTUIApp."""
+
+    @pytest.fixture
+    def mock_interceptor(self):
+        """Mock PTYInterceptor for testing."""
+        with patch(
+            "sentry_tui.pty_interceptor.PTYInterceptor"
+        ) as mock_interceptor_class:
+            mock_interceptor = Mock()
+            mock_interceptor.get_status.return_value = {
+                "state": ProcessState.RUNNING,
+                "auto_restart": False,
+                "restart_count": 0,
+                "max_restart_attempts": 5,
+                "pid": 12345,
+                "command": "test command",
+            }
+            mock_interceptor_class.return_value = mock_interceptor
+            yield mock_interceptor
+
+    @pytest.mark.asyncio
+    async def test_app_initialization_with_auto_restart(self, mock_interceptor):
+        """Test SentryTUIApp initialization with auto_restart enabled."""
+        command = ["python", "-m", "sentry_tui.dummy_app"]
+        app = SentryTUIApp(command, auto_restart=True)
+
+        async with app.run_test():
+            assert app.command == command
+            assert app.auto_restart is True
+            # auto_restart_enabled is updated from interceptor status after mount
+            # Since mock returns auto_restart=False, this will be False
+            # Let's check that it gets updated correctly
+            app.update_process_status()
+            # The reactive value is updated from interceptor status
+
+    @pytest.mark.asyncio
+    async def test_app_compose_structure_with_process_status_bar(
+        self, mock_interceptor
+    ):
+        """Test that the app composes with process status bar."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Check that process status bar is present
+            assert app.query_one("#process_status_bar", ProcessStatusBar)
+
+    @pytest.mark.asyncio
+    async def test_action_graceful_shutdown(self, mock_interceptor):
+        """Test graceful shutdown action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Call graceful shutdown action
+            app.action_graceful_shutdown()
+
+            # Verify interceptor method was called
+            mock_interceptor.graceful_shutdown.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_action_force_quit(self, mock_interceptor):
+        """Test force quit action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Call force quit action
+            app.action_force_quit()
+
+            # Verify interceptor method was called
+            mock_interceptor.force_quit.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_action_restart(self, mock_interceptor):
+        """Test restart action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Call restart action
+            app.action_restart()
+
+            # Verify interceptor method was called
+            mock_interceptor.restart.assert_called_once_with(force=False)
+
+    @pytest.mark.asyncio
+    async def test_action_force_restart(self, mock_interceptor):
+        """Test force restart action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Call force restart action
+            app.action_force_restart()
+
+            # Verify interceptor method was called
+            mock_interceptor.restart.assert_called_once_with(force=True)
+
+    @pytest.mark.asyncio
+    async def test_action_toggle_auto_restart(self, mock_interceptor):
+        """Test toggle auto-restart action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock the update_process_status method
+            with patch.object(app, "update_process_status") as mock_update:
+                # Call toggle auto-restart action
+                app.action_toggle_auto_restart()
+
+                # Verify interceptor method was called
+                mock_interceptor.toggle_auto_restart.assert_called_once()
+
+                # Verify status was updated
+                mock_update.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_process_state_change_callback(self, mock_interceptor):
+        """Test process state change callback."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Mock call_from_thread to verify it's called
+            with patch.object(app, "call_from_thread") as mock_call:
+                # Call the process state change callback
+                app.on_process_state_changed(ProcessState.RUNNING)
+
+                # Verify process_state is updated
+                assert app.process_state == ProcessState.RUNNING
+
+                # Verify call_from_thread was called to update status
+                mock_call.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_update_process_status(self, mock_interceptor):
+        """Test update_process_status method."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test():
+            # Get the process status bar
+            process_status_bar = app.query_one("#process_status_bar", ProcessStatusBar)
+
+            # Mock the update_status method to verify it's called
+            with patch.object(process_status_bar, "update_status") as mock_update:
+                # Call update_process_status
+                app.update_process_status()
+
+                # Verify interceptor get_status was called
+                # Note: get_status is called during mount and then again during update
+                assert mock_interceptor.get_status.call_count >= 1
+
+                # Verify process status bar was updated
+                mock_update.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_key_binding_graceful_shutdown(self, mock_interceptor):
+        """Test that 's' key calls graceful shutdown action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Focus the log display to ensure input doesn't consume the key
+            log_display = app.query_one("#log_display", RichLog)
+            log_display.focus()
+            await pilot.pause()
+
+            # Mock the action method to verify it's called
+            with patch.object(app, "action_graceful_shutdown") as mock_action:
+                # Press 's' to trigger graceful shutdown
+                await pilot.press("s")
+                await pilot.pause()
+
+                # Verify action was called
+                mock_action.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_key_binding_force_quit(self, mock_interceptor):
+        """Test that 'k' key calls force quit action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Focus the log display to ensure input doesn't consume the key
+            log_display = app.query_one("#log_display", RichLog)
+            log_display.focus()
+            await pilot.pause()
+
+            # Mock the action method to verify it's called
+            with patch.object(app, "action_force_quit") as mock_action:
+                # Press 'k' to trigger force quit
+                await pilot.press("k")
+                await pilot.pause()
+
+                # Verify action was called
+                mock_action.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_key_binding_restart(self, mock_interceptor):
+        """Test that 'r' key calls restart action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Focus the log display to ensure input doesn't consume the key
+            log_display = app.query_one("#log_display", RichLog)
+            log_display.focus()
+            await pilot.pause()
+
+            # Mock the action method to verify it's called
+            with patch.object(app, "action_restart") as mock_action:
+                # Press 'r' to trigger restart
+                await pilot.press("r")
+                await pilot.pause()
+
+                # Verify action was called
+                mock_action.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_key_binding_force_restart(self, mock_interceptor):
+        """Test that Shift+R calls force restart action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Focus the log display to ensure input doesn't consume the key
+            log_display = app.query_one("#log_display", RichLog)
+            log_display.focus()
+            await pilot.pause()
+
+            # Mock the action method to verify it's called
+            with patch.object(app, "action_force_restart") as mock_action:
+                # Press Shift+R to trigger force restart
+                await pilot.press("shift+r")
+                await pilot.pause()
+
+                # Verify action was called
+                mock_action.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_key_binding_toggle_auto_restart(self, mock_interceptor):
+        """Test that 'a' key calls toggle auto-restart action."""
+        command = ["test", "command"]
+        app = SentryTUIApp(command)
+
+        async with app.run_test() as pilot:
+            # Focus the log display to ensure input doesn't consume the key
+            log_display = app.query_one("#log_display", RichLog)
+            log_display.focus()
+            await pilot.pause()
+
+            # Mock the action method to verify it's called
+            with patch.object(app, "action_toggle_auto_restart") as mock_action:
+                # Press 'a' to toggle auto-restart
+                await pilot.press("a")
+                await pilot.pause()
+
+                # Verify action was called
+                mock_action.assert_called_once()
+
+
+class TestProcessStatusBar:
+    """Test cases for ProcessStatusBar widget."""
+
+    @pytest.mark.asyncio
+    async def test_process_status_bar_initialization(self):
+        """Test ProcessStatusBar initialization."""
+        status_bar = ProcessStatusBar()
+
+        assert status_bar.process_state == ProcessState.STOPPED
+        assert status_bar.auto_restart is False
+        assert status_bar.restart_count == 0
+        assert status_bar.pid is None
+        assert status_bar.command == ""
+
+    @pytest.mark.asyncio
+    async def test_process_status_bar_compose(self):
+        """Test ProcessStatusBar compose method."""
+        status_bar = ProcessStatusBar()
+
+        # Test that compose yields the expected widgets
+        widgets = list(status_bar.compose())
+        assert len(widgets) == 4  # Label, state, auto-restart, info displays
+
+    @pytest.mark.asyncio
+    async def test_process_status_bar_update_status(self):
+        """Test ProcessStatusBar update_status method."""
+        from textual.app import App
+
+        class TestApp(App):
+            def compose(self):
+                yield ProcessStatusBar(id="status_bar")
+
+        app = TestApp()
+
+        async with app.run_test():
+            status_bar = app.query_one("#status_bar", ProcessStatusBar)
+
+            # Update status
+            status_bar.update_status(
+                state=ProcessState.RUNNING,
+                auto_restart=True,
+                restart_count=3,
+                pid=12345,
+                command="test command",
+            )
+
+            # Verify internal state
+            assert status_bar.process_state == ProcessState.RUNNING
+            assert status_bar.auto_restart is True
+            assert status_bar.restart_count == 3
+            assert status_bar.pid == 12345
+            assert status_bar.command == "test command"
+
+    @pytest.mark.asyncio
+    async def test_process_status_bar_state_colors(self):
+        """Test ProcessStatusBar displays correct colors for different states."""
+        from textual.app import App
+
+        class TestApp(App):
+            def compose(self):
+                yield ProcessStatusBar(id="status_bar")
+
+        app = TestApp()
+
+        async with app.run_test():
+            status_bar = app.query_one("#status_bar", ProcessStatusBar)
+
+            # Test different state colors
+            test_states = [
+                (ProcessState.STOPPED, "dim"),
+                (ProcessState.STARTING, "yellow"),
+                (ProcessState.RUNNING, "green"),
+                (ProcessState.STOPPING, "yellow"),
+                (ProcessState.RESTARTING, "blue"),
+                (ProcessState.CRASHED, "red"),
+            ]
+
+            for state, expected_color in test_states:
+                status_bar.update_status(state=state, auto_restart=False)
+
+                # Check that the state display contains the expected color
+                state_display = status_bar.query_one("#process_state_display")
+                assert expected_color in str(state_display.renderable)
+                assert state.value.upper() in str(state_display.renderable)

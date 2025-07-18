@@ -10,6 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Service Toggle Bar**: Horizontal bar with checkboxes to show/hide specific services in real-time
 - **Dynamic service discovery**: Automatically detects and adds toggles for any new services found in logs
+- **Process Management**: Complete process lifecycle control without restarting sentry-tui
+  - **Graceful shutdown**: Send SIGTERM to devserver process (key: `s`)
+  - **Force quit**: Send SIGKILL to devserver process (key: `k`)
+  - **Graceful restart**: Restart devserver using SIGTERM (key: `r`)
+  - **Force restart**: Restart devserver using SIGKILL (key: `Shift+R`)
+  - **Auto-restart**: Automatically restart devserver on crashes (key: `a`)
+  - **Thread-safe synchronization**: Proper locks and events to prevent race conditions
+- **Process Status Bar**: Real-time display of process state, PID, restart count, and auto-restart status
 - Comprehensive ANSI escape code regex ported from Node.js chalk library for robust terminal output parsing
 - ANSI background color stripping function to prevent color bleeding while preserving foreground colors and formatting
 - Rich-based coloring system to replace ANSI codes with clean, reliable styling
@@ -104,3 +112,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `l` - Focus log display
 - `c` - Clear all logs
 - `p` - Toggle pause/resume log capture
+- `s` - Graceful shutdown devserver
+- `k` - Force quit devserver
+- `r` - Restart devserver (graceful)
+- `Shift+R` - Force restart devserver
+- `a` - Toggle auto-restart functionality

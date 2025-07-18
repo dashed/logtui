@@ -13,6 +13,11 @@ Sentry TUI provides an interactive terminal interface for viewing and filtering 
 - **Real-time Log Capture**: PTY-based interception preserves colors and terminal behavior
 - **Interactive Filtering**: Filter logs as you type with case-insensitive search
 - **Service Toggle Bar**: Horizontal checkboxes to show/hide specific services in real-time
+- **Process Management**: Complete devserver lifecycle control without restarting sentry-tui
+  - **Graceful shutdown** and **force quit** operations
+  - **Graceful restart** and **force restart** operations
+  - **Auto-restart** functionality for crashed processes
+- **Process Status Bar**: Real-time display of process state, PID, restart count, and auto-restart status
 - **Service Recognition**: Automatically identifies and color-codes different services (server, worker, webpack, etc.)
 - **Rich Text Display**: Clean, colorized output using Rich library
 - **Keyboard Navigation**: Focus between filter input and log display
@@ -62,6 +67,9 @@ uv run python -m sentry_tui.pty_interceptor sentry devserver --workers
 
 # Or with activated venv
 python -m sentry_tui.pty_interceptor sentry devserver --workers
+
+# Enable auto-restart for crashed processes
+uv run python -m sentry_tui.pty_interceptor --auto-restart sentry devserver --workers
 ```
 
 ### Web Browser Mode
@@ -76,11 +84,21 @@ Then navigate to `http://localhost:8000` in your browser.
 
 ### Keyboard Shortcuts
 
+**Navigation:**
 - **`f`** - Focus filter input
 - **`l`** - Focus log display
+- **`q`** or **`Ctrl+C`** - Quit application
+
+**Log Management:**
 - **`c`** - Clear all logs
 - **`p`** - Pause/Resume log capture
-- **`q`** or **`Ctrl+C`** - Quit application
+
+**Process Control:**
+- **`s`** - Graceful shutdown devserver
+- **`k`** - Force quit devserver
+- **`r`** - Restart devserver (graceful)
+- **`Shift+R`** - Force restart devserver
+- **`a`** - Toggle auto-restart functionality
 
 ### Filtering
 
@@ -93,6 +111,30 @@ Then navigate to `http://localhost:8000` in your browser.
 - Click checkboxes in the Service Toggle Bar to show/hide specific services
 - Combine service toggles with text filtering for precise log viewing
 - All services are shown by default
+
+### Process Management
+
+The TUI provides complete control over the devserver process lifecycle:
+
+**Process States:**
+- **STOPPED** - Process is not running
+- **STARTING** - Process is being started
+- **RUNNING** - Process is running normally
+- **STOPPING** - Process is being stopped
+- **RESTARTING** - Process is restarting
+- **CRASHED** - Process has crashed
+
+**Process Control:**
+- **Graceful Shutdown** (`s`): Sends SIGTERM to allow clean shutdown
+- **Force Quit** (`k`): Sends SIGKILL for immediate termination
+- **Graceful Restart** (`r`): Stops with SIGTERM and restarts
+- **Force Restart** (`Shift+R`): Stops with SIGKILL and restarts
+
+**Auto-Restart:**
+- Toggle with `a` key or `--auto-restart` flag
+- Automatically restarts crashed processes
+- Configurable maximum restart attempts (default: 5)
+- Displays restart count in status bar
 
 ## Development
 
