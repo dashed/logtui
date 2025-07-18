@@ -1,6 +1,6 @@
 # Makefile for sentry-tui development
 
-.PHONY: sync run-dummy test-dummy pty-test serve clean help dev test test-unit test-integration test-fast test-slow lint format check typecheck
+.PHONY: sync run-dummy test-dummy pty-test serve clean help dev test test-unit test-integration test-fast test-slow lint format check typecheck install
 
 # Default target - show help
 .DEFAULT_GOAL := help
@@ -34,6 +34,10 @@ serve:
 # Development workflow - sync and run tests
 dev: sync
 	@echo "Development environment ready!"
+
+# Install as global tool (force reinstall)
+install:
+	uv tool install . --force
 
 # Run all tests
 test:
@@ -92,6 +96,7 @@ help:
 	@echo "  pty-test        - Test PTY-based interception (press 'q' or Ctrl+C to exit)"
 	@echo "  serve           - Run the PTY interceptor application in a web browser"
 	@echo "  dev             - Setup development environment"
+	@echo "  install         - Install as global tool (uv tool install . --force)"
 	@echo ""
 	@echo "Testing:"
 	@echo "  test            - Run all tests"

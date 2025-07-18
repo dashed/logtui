@@ -11,7 +11,6 @@ dependencies = [
 
 [project.scripts]
 sentry-tui = "sentry_tui:main"
-dummy-app = "sentry_tui.dummy_app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

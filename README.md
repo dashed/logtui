@@ -53,6 +53,9 @@ uv tool install .
 
 # Or install editable for development
 uv tool install --editable .
+
+# Force reinstall (useful for updates)
+make install
 ```
 
 This installs the `sentry-tui` command globally, available from any directory.
@@ -211,6 +214,7 @@ make help
 - `make format` - Format code with ruff
 - `make typecheck` - Type check with ty
 - `make check` - Run all quality checks
+- `make install` - Install as global tool (force reinstall)
 - `make clean` - Clean up generated files
 
 ### Testing
