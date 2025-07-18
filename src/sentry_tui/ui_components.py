@@ -28,30 +28,30 @@ class ServiceToggleBar(Horizontal):
         self.enabled_services = set(self.services)  # All services enabled by default
 
     def compose(self) -> ComposeResult:
-        """Compose the service toggle bar."""
-        if not self.services:
-            yield Static("No services detected yet...", classes="service-placeholder")
-        else:
-            for service in self.services:
-                yield Checkbox(service, value=True, id=f"service_{service}")
+        """Compose the service toggle checkboxes."""
+        for service in self.services:
+            yield Checkbox(
+                f"[b]{service}[/b]",
+                value=True,  # All services enabled by default
+                id=f"service_{service}",
+                compact=True,
+            )
 
     def add_service(self, service: str) -> None:
-        """Add a new service toggle if it doesn't exist."""
+        """Add a new service to the toggle bar if it doesn't exist."""
         if service not in self.services:
             self.services.append(service)
             self.enabled_services.add(service)  # New services enabled by default
-            
-            # Remove placeholder if it exists
-            try:
-                placeholder = self.query_one(".service-placeholder")
-                placeholder.remove()
-            except:
-                pass  # Placeholder doesn't exist
-            
-            # Add new checkbox widget only if the widget is mounted
+
+            # Add the checkbox widget only if the widget is mounted
             if self.is_mounted:
-                new_checkbox = Checkbox(service, value=True, id=f"service_{service}")
-                self.mount(new_checkbox)
+                checkbox = Checkbox(
+                    f"[b]{service}[/b]",
+                    value=True,
+                    id=f"service_{service}",
+                    compact=True,
+                )
+                self.mount(checkbox)
 
     def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
         """Handle checkbox state changes."""

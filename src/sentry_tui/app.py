@@ -175,7 +175,8 @@ class SentryTUIApp(App):
     def on_service_toggle_bar_service_toggled(
         self, event: ServiceToggleBar.ServiceToggled
     ) -> None:
-        """Handle service toggle changes."""
+        """Handle service toggle events."""
+        # Update the log display when service toggles change
         self.update_log_display()
 
     def handle_log_output(self, line: str) -> None:
@@ -227,24 +228,25 @@ class SentryTUIApp(App):
 
     def add_log_line(self, log_line: LogLine) -> None:
         """Add a log line to the display."""
-        log_display = self.query_one("#log_display", RichLog)
+        log_widget = self.query_one("#log_display", RichLog)
         # Apply Rich-based coloring instead of ANSI codes
-        colored_text = apply_rich_coloring(log_line.content.rstrip("\n"))
-        log_display.write(colored_text, scroll_end=True)
+        rich_content = apply_rich_coloring(log_line.content.rstrip("\n"))
+        log_widget.write(rich_content, scroll_end=True)
 
     def update_log_display(self) -> None:
-        """Update the log display based on current filters."""
-        log_display = self.query_one("#log_display", RichLog)
-        log_display.clear()
+        """Update the log display with filtered content."""
+        log_widget = self.query_one("#log_display", RichLog)
+        log_widget.clear()
 
-        # Re-display all matching lines
+        # Show filtered log lines
         for log_line in self.log_lines:
             if self.matches_filter(log_line):
-                colored_text = apply_rich_coloring(log_line.content.rstrip("\n"))
-                log_display.write(colored_text, scroll_end=False)
+                # Apply Rich-based coloring instead of ANSI codes
+                rich_content = apply_rich_coloring(log_line.content.rstrip("\n"))
+                log_widget.write(rich_content, scroll_end=False)
 
-        # Scroll to end after all lines are added
-        log_display.scroll_end()
+        # Scroll to end
+        log_widget.scroll_end()
 
     def action_quit(self) -> None:
         """Quit the application."""
@@ -269,26 +271,36 @@ class SentryTUIApp(App):
     def action_toggle_pause(self) -> None:
         """Toggle pause/resume of log capture."""
         self.paused = not self.paused
+        # Update footer to show pause status
+        self.refresh()
 
     def action_graceful_shutdown(self) -> None:
         """Gracefully shutdown the devserver."""
         if self.interceptor:
             self.interceptor.graceful_shutdown()
+            # Force an immediate status update
+            self.update_process_status()
 
     def action_force_quit(self) -> None:
         """Force quit the devserver."""
         if self.interceptor:
             self.interceptor.force_quit()
+            # Force an immediate status update
+            self.update_process_status()
 
     def action_restart(self) -> None:
-        """Restart the devserver (graceful)."""
+        """Restart the devserver gracefully."""
         if self.interceptor:
             self.interceptor.restart(force=False)
+            # Force an immediate status update
+            self.update_process_status()
 
     def action_force_restart(self) -> None:
         """Force restart the devserver."""
         if self.interceptor:
             self.interceptor.restart(force=True)
+            # Force an immediate status update
+            self.update_process_status()
 
     def action_toggle_auto_restart(self) -> None:
         """Toggle auto-restart functionality."""

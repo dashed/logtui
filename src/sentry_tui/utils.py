@@ -12,43 +12,42 @@ def strip_ansi_codes(text: str) -> str:
 
 
 def apply_rich_coloring(text: str) -> Text:
-    """Apply Rich-based coloring to replace ANSI codes with clean styling.
-    
-    This function strips ANSI codes and applies Rich-based coloring based on
-    service detection and log level patterns. It provides cleaner, more reliable
-    styling than raw ANSI codes while preserving the visual information.
-    
-    Args:
-        text: Raw text with potential ANSI codes
-        
-    Returns:
-        Rich Text object with clean styling applied
-    """
-    # First strip any existing ANSI codes
+    """Apply Rich-based coloring to log text while stripping ANSI codes."""
+    # Strip all ANSI codes first
     clean_text = strip_ansi_codes(text)
-    
-    # Create Rich Text object
+
+    # Create a Rich Text object
     rich_text = Text(clean_text)
-    
-    # Apply service-based coloring by detecting service names
-    for service, color in SENTRY_SERVICE_COLORS.items():
-        if service in clean_text.lower():
-            # Find service name positions and apply color
-            start = clean_text.lower().find(service)
-            if start != -1:
-                end = start + len(service)
-                rich_text.stylize(color, start, end)
-            break  # Only apply first matching service color
-    
-    # Apply log level based coloring
-    clean_lower = clean_text.lower()
-    if any(word in clean_lower for word in ["error", "exception", "traceback", "failed", "critical"]):
-        rich_text.stylize("red bold")
-    elif any(word in clean_lower for word in ["warning", "warn", "deprecated"]):
-        rich_text.stylize("yellow")
-    elif any(word in clean_lower for word in ["debug"]):
-        rich_text.stylize("dim")
-    
+
+    # Apply coloring based on content patterns
+    if "server" in clean_text:
+        # Purple color for server logs (matching Sentry's color scheme)
+        rich_text.highlight_regex(r"\bserver\b", style="rgb(108,95,199)")
+    elif "worker" in clean_text or "taskworker" in clean_text:
+        # Yellow color for worker logs
+        rich_text.highlight_regex(r"\b(worker|taskworker)\b", style="rgb(255,194,39)")
+    elif "webpack" in clean_text:
+        # Blue color for webpack logs
+        rich_text.highlight_regex(r"\bwebpack\b", style="rgb(61,116,219)")
+    elif "cron" in clean_text or "celery-beat" in clean_text:
+        # Pink color for cron/beat logs
+        rich_text.highlight_regex(r"\b(cron|celery-beat)\b", style="rgb(255,86,124)")
+    elif "relay" in clean_text:
+        # Red color for relay logs
+        rich_text.highlight_regex(r"\brelay\b", style="rgb(250,71,71)")
+    elif "getsentry-outcomes" in clean_text:
+        # Orange color for outcomes logs
+        rich_text.highlight_regex(r"\bgetsentry-outcomes\b", style="rgb(255,119,56)")
+
+    # Apply log level coloring
+    rich_text.highlight_regex(r"\[ERROR\]", style="bold red")
+    rich_text.highlight_regex(r"\[WARNING\]", style="bold yellow")
+    rich_text.highlight_regex(r"\[INFO\]", style="bold blue")
+    rich_text.highlight_regex(r"\[DEBUG\]", style="bold dim")
+
+    # Highlight timestamps
+    rich_text.highlight_regex(r"\d{2}:\d{2}:\d{2}", style="dim")
+
     return rich_text
 
 

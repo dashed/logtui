@@ -29,15 +29,15 @@ class ProcessState(Enum):
     CRASHED = "crashed"
 
 
-# Sentry service color mapping based on actual Sentry devserver source code
-# Source: /Users/me/aaa/sentry/sentry/src/sentry/runner/formatting.py:18-24
+# Sentry service colors from src/sentry/runner/formatting.py:18-24
 SENTRY_SERVICE_COLORS = {
-    "server": "purple",      # Django web server
-    "worker": "yellow",      # Celery worker  
-    "webpack": "blue",       # Frontend build process
-    "celery-beat": "magenta", # Periodic task scheduler
-    "relay": "red",          # Relay service
-    "getsentry-outcomes": "bright_yellow",  # Billing/outcomes service
-    "system": "cyan",        # System messages
-    "taskworker": "green",   # Task worker processes
+    "server": (108, 95, 199),
+    "worker": (255, 194, 39),
+    "webpack": (61, 116, 219),
+    "cron": (255, 86, 124),
+    "relay": (250, 71, 71),
+    # Additional getsentry service from getsentry/conf/settings/dev.py:205
+    "getsentry-outcomes": (255, 119, 56),  # Orange color for billing/outcomes
+    "celery-beat": (255, 86, 124),  # Same as cron
+    "taskworker": (255, 194, 39),  # Same as worker
 }
