@@ -8,3 +8,8 @@ dependencies = [
     "textual>=4.0.0",
     "textual-dev>=1.7.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]

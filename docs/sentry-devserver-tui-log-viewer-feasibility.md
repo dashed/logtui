@@ -123,7 +123,7 @@ string = re.sub(r"Traceback \(most recent call last\).*",
 
 ## Log Interception Strategies
 
-### 1. Process Wrapper Approach ⭐ **RECOMMENDED**
+### 1. Process Wrapper Approach 
 **Concept**: Create a wrapper script that spawns the devserver and captures all output
 
 ```python
